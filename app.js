@@ -43,12 +43,37 @@ function showResult(id, message) {
     }
 }
 
+/**
+ * Formats a number into a readable string with suffixes for thousands (k)
+ * and millions (M).
+ * @param {number} num - The number to format.
+ * @returns {string} - The formatted string.
+ */
 function formatNumber(num) {
+    // Return '0' if the number is 0
     if (num === 0) return '0';
-    if (Math.abs(num) < 1e-6) return num.toExponential(4);
-    if (Math.abs(num) < 1) return num.toPrecision(4);
-    if (Math.abs(num) >= 1000) return num.toExponential(4);
-    return Number(num.toPrecision(6)).toString();
+
+    const absNum = Math.abs(num);
+
+    // Rule for Millions (e.g., 2,500,000 -> 2.50M)
+    if (absNum >= 1e6) {
+        return (num / 1e6).toFixed(2) + 'M';
+    }
+
+    // Rule for Thousands (e.g., 100,000 -> 100k; 25,500 -> 25.5k)
+    if (absNum >= 1e3) {
+        // Divide by 1000, show one decimal, and remove '.0' if it's a whole number
+        return (num / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+    }
+
+    // Rule for small decimals (e.g., 0.05 -> 0.0500)
+    if (absNum < 1) {
+        return num.toPrecision(3);
+    }
+
+    // Rule for numbers between 1 and 999 (e.g., 4.95, 50)
+    // This will format the number with up to 2 decimal places.
+    return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 /**
