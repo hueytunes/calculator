@@ -55,13 +55,35 @@ function formatNumber(num) {
  * Parses a string that may contain scientific notation (e.g., '1.2e6' or '1.2x10^6')
  * @param {string} value - The input string from the user.
  * @returns {{error: string}|number} - The parsed number or an error object.
+ /**
+ * Parses a string that may contain scientific notation or common suffixes
+ * like 'k' (thousand) or 'million'.
+ * @param {string} value - The input string from the user.
+ * @returns {{error: string}|number} - The parsed number or an error object.
  */
 function parseScientific(value) {
     if (typeof value !== 'string') value = String(value);
-    const sanitizedValue = value.trim().toLowerCase().replace(/x10\^/, 'e');
+
+    // Sanitize the string: remove whitespace and make it lowercase
+    let sanitizedValue = value.trim().toLowerCase();
+
+    // NEW: Handle 'million' suffix (e.g., '2.5 million' -> '2.5e6')
+    // The \s* allows for an optional space between the number and "million"
+    sanitizedValue = sanitizedValue.replace(/\s*million/, 'e6');
+
+    // NEW: Handle 'k' suffix (e.g., '25k' -> '25e3')
+    // The $ ensures we only replace 'k' if it's at the very end of the string
+    sanitizedValue = sanitizedValue.replace(/k$/, 'e3');
+
+    // Handle scientific 'x10^' notation (e.g., '3x10^5' -> '3e5')
+    sanitizedValue = sanitizedValue.replace(/x10\^/, 'e');
+
+    // Parse the potentially modified string into a number
     const val = parseFloat(sanitizedValue);
+
+    // If parsing fails, return an error with updated examples
     if (isNaN(val)) {
-        return { error: `Invalid number input: "${value}". Please use standard or scientific notation (e.g., 1000 or 1e3).` };
+        return { error: `Invalid number input: "${value}". Please use standard or scientific notation (e.g., 1000, 1e3, 25k, or 2.5 million).` };
     }
     return val;
 }
