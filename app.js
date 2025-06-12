@@ -45,35 +45,33 @@ function showResult(id, message) {
 
 /**
  * Formats a number into a readable string with suffixes for thousands (k)
- * and millions (M).
+ * and millions (M), or scientific notation for very small numbers.
  * @param {number} num - The number to format.
  * @returns {string} - The formatted string.
  */
 function formatNumber(num) {
-    // Return '0' if the number is 0
+    // Always handle the zero case first
     if (num === 0) return '0';
 
     const absNum = Math.abs(num);
 
-    // Rule for Millions (e.g., 2,500,000 -> 2.50M)
+    // Rule for numbers >= 1,000,000 (e.g., 2,500,000 -> "2.50M")
     if (absNum >= 1e6) {
         return (num / 1e6).toFixed(2) + 'M';
     }
-
-    // Rule for Thousands (e.g., 100,000 -> 100k; 25,500 -> 25.5k)
-    if (absNum >= 1e3) {
-        // Divide by 1000, show one decimal, and remove '.0' if it's a whole number
+    // Rule for numbers >= 1,000 (e.g., 100,000 -> "100k")
+    else if (absNum >= 1e3) {
         return (num / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
     }
-
-    // Rule for small decimals (e.g., 0.05 -> 0.0500)
-    if (absNum < 1) {
+    // Rule for numbers between 1 and 999 (e.g., 50 -> "50")
+    else if (absNum >= 1) {
+        return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+    // Rule for ALL numbers less than 1
+    else {
+        // Use toPrecision for significant figures. (e.g., 0.0005 -> "5.00e-4")
         return num.toPrecision(3);
     }
-
-    // Rule for numbers between 1 and 999 (e.g., 4.95, 50)
-    // This will format the number with up to 2 decimal places.
-    return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
  /**
  * Parses a string that may contain scientific notation or common suffixes
@@ -329,83 +327,92 @@ function calculateSerialDose() {
     hideAndClear(getEl('sd_result'));
     hideAndClear(getEl('sd_error'));
 
-    // --- 1. Get and Parse All Inputs to Base Units ---
-    // Concentration to mg/mL (g/L and µg/µL are the same as mg/mL)
+    // --- NEW: Capture original inputs for the final message ---
+    const originalFinalMassVal = getEl('sd_final_mass_val').value;
+    const originalFinalMassUnit = getEl('sd_final_mass_unit').value;
+    const originalFinalVolVal = getEl('sd_final_vol_val').value;
+    const originalFinalVolUnit = getEl('sd_final_vol_unit').value;
+    
+    // --- 1. Get and Parse All Inputs ---
     const stockConcMap = { 'mg/mL': 1, 'µg/µL': 1, 'g/L': 1, 'ng/mL': 1e-3 };
-const c1 = parseToBase(getEl('sd_stock_val').value, getEl('sd_stock_unit').value, stockConcMap, 'concentration');
-if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
+    const c1 = parseToBase(getEl('sd_stock_val').value, getEl('sd_stock_unit').value, stockConcMap, 'concentration');
+    if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
 
-    // Final mass to mg
-    const finalMass_g = parseToBase(getEl('sd_final_mass_val').value, getEl('sd_final_mass_unit').value, massToBase, 'mass');
-if (finalMass_g.error) { showError('sd_error', finalMass_g.error); return; }
-const finalMass_mg = finalMass_g * 1000; // Convert from grams to mg for the function's math
-    if (finalMass_mg.error) { showError('sd_error', finalMass_mg.error); return; }
+    const finalMass_g = parseToBase(originalFinalMassVal, originalFinalMassUnit, massToBase, 'mass');
+    if (finalMass_g.error) { showError('sd_error', finalMass_g.error); return; }
+    const finalMass_mg = finalMass_g * 1000;
 
-    // Final volume to µL
-    const finalVol_uL = parseToBase(getEl('sd_final_vol_val').value, getEl('sd_final_vol_unit').value, { 'mL': 1000, 'µL': 1 }, 'volume');
+    const finalVol_uL = parseToBase(originalFinalVolVal, originalFinalVolUnit, { 'mL': 1000, 'µL': 1 }, 'volume');
     if (finalVol_uL.error) { showError('sd_error', finalVol_uL.error); return; }
 
-    // Min pipette volume to µL
     const minPipetteVol_uL = parseScientific(getEl('sd_min_pipette_vol').value);
     if (minPipetteVol_uL.error || minPipetteVol_uL <= 0) { showError('sd_error', 'Invalid Minimum Pipetting Volume.'); return; }
     
     // --- 2. Perform Core Calculations ---
-    // Final concentration required, in mg/mL (or µg/µL)
-    const c2 = finalMass_mg / (finalVol_uL / 1000); //  (finalVol_uL / 1000) converts µL to mL
+    const c2 = finalMass_mg / (finalVol_uL / 1000);
 
     if (c1 < c2) {
         showError('sd_error', 'Stock Concentration cannot be less than the required Final Concentration.');
         return;
     }
 
-    // Calculate the volume needed for a direct dilution
-    const direct_v1_uL = (c2 * finalVol_uL) / c1;
-
+    let direct_v1_uL = (c2 * finalVol_uL) / c1;
     let resultHtml = '';
-
-    // --- 3. Determine Strategy: Direct vs. Serial Dilution ---
+    
+    // --- 3. Determine Strategy: Direct vs. Iterative Serial Dilution ---
     if (direct_v1_uL >= minPipetteVol_uL) {
-        // Direct dilution is possible
         const diluentVol_uL = finalVol_uL - direct_v1_uL;
         resultHtml = `
-            <p class="font-semibold text-green-800">A direct dilution is possible.</p>
+            <p class="font-semibold text-green-800">A direct dilution is feasible.</p>
             <p class="mt-2">To prepare your dose:</p>
             <ul class="list-disc list-inside mt-2 space-y-1">
-                <li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your ${formatNumber(c1)} mg/mL stock.</li>
+                <li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your original stock.</li>
                 <li>Add <strong>${formatNumber(diluentVol_uL)} µL</strong> of diluent.</li>
             </ul>
         `;
     } else {
-        // Serial dilution is required
-        const c_inter = c2 * (finalVol_uL / minPipetteVol_uL);
-        const v_inter_total_uL = 100; // Let's make 100 µL of intermediate stock
-        const v1_for_inter_uL = (c_inter * v_inter_total_uL) / c1;
-        const diluent_for_inter_uL = v_inter_total_uL - v1_for_inter_uL;
+        resultHtml = `<p class="font-semibold">Direct dilution is inaccurate (${formatNumber(direct_v1_uL)} µL). A multi-step serial dilution is required:</p>`;
         
-        const v_inter_for_final_uL = minPipetteVol_uL;
-        const diluent_for_final_uL = finalVol_uL - v_inter_for_final_uL;
+        let currentStockConc = c1;
+        let stepCounter = 1;
+        let dilutionStepsHtml = '';
+        const DILUTION_FACTOR = 100;
+        const DILUTION_VOL_STOCK = 2;
+        const DILUTION_VOL_DILUENT = 198;
 
-        resultHtml = `
-            <p class="font-semibold">A direct dilution involves pipetting a potentially inaccurate volume (${formatNumber(direct_v1_uL)} µL). A two-step serial dilution is recommended.</p>
-            
-            <div class="mt-4">
-                <p class="font-medium">Step 1: Prepare an Intermediate Stock (${formatNumber(c_inter)} mg/mL)</p>
-                <ul class="list-disc list-inside mt-2 space-y-1">
-                    <li>Take <strong>${formatNumber(v1_for_inter_uL)} µL</strong> of your original ${formatNumber(c1)} mg/mL stock.</li>
-                    <li>Add <strong>${formatNumber(diluent_for_inter_uL)} µL</strong> of diluent.</li>
-                    <li class="text-sm text-slate-600">This creates ${formatNumber(v_inter_total_uL)} µL of a ${formatNumber(c_inter)} mg/mL intermediate stock.</li>
-                </ul>
-            </div>
+        while ((c2 * finalVol_uL) / currentStockConc < minPipetteVol_uL) {
+            const nextStockConc = currentStockConc / DILUTION_FACTOR;
+            dilutionStepsHtml += `
+                <div class="mt-4">
+                    <p class="font-medium">Step ${stepCounter}: Prepare Intermediate Stock #${stepCounter} (${formatNumber(nextStockConc)} mg/mL)</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li>Take <strong>${DILUTION_VOL_STOCK} µL</strong> of your previous stock (${formatNumber(currentStockConc)} mg/mL).</li>
+                        <li>Add <strong>${DILUTION_VOL_DILUENT} µL</strong> of diluent.</li>
+                    </ul>
+                </div>
+            `;
+            currentStockConc = nextStockConc;
+            stepCounter++;
+            if (stepCounter > 5) {
+                 showError('sd_error', 'Dilution requires more than 5 steps. Check inputs.'); 
+                 return;
+            }
+        }
+        
+        const final_v1_uL = (c2 * finalVol_uL) / currentStockConc;
+        const final_diluent_uL = finalVol_uL - final_v1_uL;
 
+        dilutionStepsHtml += `
             <div class="mt-4">
-                <p class="font-medium">Step 2: Prepare the Final Dose</p>
+                <p class="font-medium">Step ${stepCounter}: Prepare the Final Dose</p>
                 <ul class="list-disc list-inside mt-2 space-y-1">
-                    <li>Take <strong>${formatNumber(v_inter_for_final_uL)} µL</strong> of your new intermediate stock.</li>
-                    <li>Add <strong>${formatNumber(diluent_for_final_uL)} µL</strong> of diluent.</li>
-                    <li class="text-sm text-slate-600">This gives you a final volume of ${formatNumber(finalVol_uL)} µL containing exactly ${formatNumber(finalMass_mg * 1000)} µg of the drug.</li>
+                    <li>Take <strong>${formatNumber(final_v1_uL)} µL</strong> of Intermediate Stock #${stepCounter - 1} (${formatNumber(currentStockConc)} mg/mL).</li>
+                    <li>Add <strong>${formatNumber(final_diluent_uL)} µL</strong> of diluent.</li>
+                    <li class="text-sm text-slate-600">This gives you a final volume of ${originalFinalVolVal} ${originalFinalVolUnit} containing exactly <strong>${originalFinalMassVal} ${originalFinalMassUnit}</strong> of the drug.</li>
                 </ul>
             </div>
         `;
+        resultHtml += dilutionStepsHtml;
     }
     showResult('sd_result', resultHtml);
 }
