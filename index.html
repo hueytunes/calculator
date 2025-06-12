@@ -64,6 +64,8 @@
           <button class="tab border-b-2 border-transparent py-3 px-4 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 focus:outline-none" data-target="#reconstitution-calculator">Reconstitution</button>
           <button class="tab border-b-2 border-transparent py-3 px-4 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 focus:outline-none" data-target="#mass-vol-conc-calculator">Mass/Vol/Conc</button>
           <button class="tab border-b-2 border-transparent py-3 px-4 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 focus:outline-none" data-target="#cell-seeding-calculator">Cell Seeding</button>
+          <button class="tab border-b-2 border-transparent py-3 px-4 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 focus:outline-none" data-target="#serial-dose-calculator">Serial Dosing</button>
+
         </div>
       </nav>
 
@@ -297,7 +299,54 @@
              <div id="cs_error" class="text-red-600 text-sm mt-2 font-medium"></div>
              <div id="cs_result" class="bg-green-50 text-green-800 p-4 rounded-md mt-4 hidden"></div>
         </div>
-        
+        <div id="serial-dose-calculator" class="calculator-section space-y-4">
+    <h3 class="text-xl font-semibold text-slate-900">Serial Dilution for Dosing</h3>
+    <p class="text-sm text-slate-600">Calculates a two-step serial dilution for preparing a precise, low-volume dose from a high-concentration stock.</p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label for="sd_stock_val" class="block text-sm font-medium text-slate-700">Original Stock Concentration</label>
+            <div class="flex mt-1">
+                <input type="text" id="sd_stock_val" placeholder="e.g., 50" class="flex-grow rounded-l-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <select id="sd_stock_unit" class="rounded-r-md border-slate-300 border-l-0 bg-slate-50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <option value="mg/mL">mg/mL</option>
+                    <option value="µg/µL">µg/µL</option>
+                    <option value="g/L">g/L</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label for="sd_final_mass_val" class="block text-sm font-medium text-slate-700">Desired Final Mass</label>
+            <div class="flex mt-1">
+                <input type="text" id="sd_final_mass_val" placeholder="e.g., 25" class="flex-grow rounded-l-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <select id="sd_final_mass_unit" class="rounded-r-md border-slate-300 border-l-0 bg-slate-50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <option value="µg">µg</option>
+                    <option value="mg">mg</option>
+                    <option value="g">g</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label for="sd_final_vol_val" class="block text-sm font-medium text-slate-700">Desired Final Volume</label>
+            <div class="flex mt-1">
+                <input type="text" id="sd_final_vol_val" placeholder="e.g., 5" class="flex-grow rounded-l-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <select id="sd_final_vol_unit" class="rounded-r-md border-slate-300 border-l-0 bg-slate-50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <option value="µL">µL</option>
+                    <option value="mL">mL</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label for="sd_min_pipette_vol" class="block text-sm font-medium text-slate-700">Min. Pipetting Volume (µL)</label>
+            <input type="text" id="sd_min_pipette_vol" value="2" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+        </div>
+    </div>
+    <div class="pt-2">
+        <button id="calculate_sd_btn" class="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Calculate</button>
+    </div>
+    <div id="sd_error" class="text-red-600 text-sm mt-2 font-medium"></div>
+    <div id="sd_result" class="bg-indigo-50 text-indigo-800 p-4 rounded-md mt-4 hidden"></div>
+</div>
       </div>
     </div>
   </main>
