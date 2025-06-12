@@ -299,6 +299,8 @@
              <div id="cs_error" class="text-red-600 text-sm mt-2 font-medium"></div>
              <div id="cs_result" class="bg-green-50 text-green-800 p-4 rounded-md mt-4 hidden"></div>
         </div>
+        
+        <!-- SERIAL DOSING CALCULATOR -->
         <div id="serial-dose-calculator" class="calculator-section space-y-4">
     <h3 class="text-xl font-semibold text-slate-900">Serial Dilution for Dosing</h3>
     <p class="text-sm text-slate-600">Calculates a two-step serial dilution for preparing a precise, low-volume dose from a high-concentration stock.</p>
@@ -320,7 +322,8 @@
             <div class="flex mt-1">
                 <input type="text" id="sd_final_mass_val" placeholder="e.g., 25" class="flex-grow rounded-l-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                 <select id="sd_final_mass_unit" class="rounded-r-md border-slate-300 border-l-0 bg-slate-50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    <option value="µg">µg</option>
+                  <option value="ng">ng</option>  
+                  <option value="µg">µg</option>
                     <option value="mg">mg</option>
                     <option value="g">g</option>
                 </select>
