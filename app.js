@@ -362,10 +362,10 @@ function calculateSerialDose() {
 
     // --- 3. Determine Strategy: Direct vs. Serial Dilution ---
     if (direct_v1_uL >= minPipetteVol_uL) {
-        // Direct dilution is feasible
+        // Direct dilution is possible
         const diluentVol_uL = finalVol_uL - direct_v1_uL;
         resultHtml = `
-            <p class="font-semibold text-green-800">A direct dilution is feasible.</p>
+            <p class="font-semibold text-green-800">A direct dilution is possible.</p>
             <p class="mt-2">To prepare your dose:</p>
             <ul class="list-disc list-inside mt-2 space-y-1">
                 <li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your ${formatNumber(c1)} mg/mL stock.</li>
@@ -383,7 +383,7 @@ function calculateSerialDose() {
         const diluent_for_final_uL = finalVol_uL - v_inter_for_final_uL;
 
         resultHtml = `
-            <p class="font-semibold">Direct dilution requires pipetting an inaccurate volume (${formatNumber(direct_v1_uL)} µL). A two-step serial dilution is recommended.</p>
+            <p class="font-semibold">A direct dilution involves pipetting a potentially inaccurate volume (${formatNumber(direct_v1_uL)} µL). A two-step serial dilution is recommended.</p>
             
             <div class="mt-4">
                 <p class="font-medium">Step 1: Prepare an Intermediate Stock (${formatNumber(c_inter)} mg/mL)</p>
