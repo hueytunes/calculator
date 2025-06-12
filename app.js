@@ -83,17 +83,16 @@ function formatNumber(num) {
 function formatConcentration(conc_mg_per_ml) {
     if (conc_mg_per_ml === 0) return '0 mg/mL';
 
-    // If concentration is 1 mg/mL or higher, keep it as mg/mL
-    if (conc_mg_per_ml >= 1) {
-        return formatNumber(conc_mg_per_ml) + ' mg/mL';
-    }
-    // If it's less than 1 mg/mL, convert to µg/mL
-    else if (conc_mg_per_ml >= 1e-3) {
-        return formatNumber(conc_mg_per_ml * 1000) + ' µg/mL';
-    }
-    // If it's less than 1 µg/mL, convert to ng/mL
-    else {
-        return formatNumber(conc_mg_per_ml * 1e6) + ' ng/mL';
+    // Convert to ng/mL for comparison, as it's the smallest common unit here
+    const conc_ng_per_ml = conc_mg_per_ml * 1e6;
+
+    if (conc_ng_per_ml >= 1000) { // If it's 1 µg/mL or more
+        if (conc_ng_per_ml >= 1e6) { // If it's 1 mg/mL or more
+             return formatNumber(conc_mg_per_ml) + ' mg/mL';
+        }
+        return formatNumber(conc_mg_per_ml / 1000) + ' µg/mL';
+    } else {
+        return formatNumber(conc_ng_per_ml) + ' ng/mL';
     }
 }
 
@@ -391,7 +390,7 @@ function calculateSerialDose() {
         volUnit: getEl('sd_final_vol_unit').value,
     };
     
-    const stockConcMap = { 'mg/mL': 1, 'µg/µL': 1, 'g/L': 1, 'ng/mL': 1e-3 };
+    const stockConcMap = { 'mg/mL': 1, 'µg/mL': 1e-3, 'g/L': 1, 'ng/mL': 1e-6 }; // Corrected ng/mL to be relative to mg/mL
     const c1 = parseToBase(getEl('sd_stock_val').value, getEl('sd_stock_unit').value, stockConcMap, 'concentration');
     if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
 
@@ -413,33 +412,62 @@ function calculateSerialDose() {
     }
 
     let direct_v1_uL = (c2 * finalVol_uL) / c1;
-    let resultHtml = '';
     
+    // --- Strategy 1: The Best Case - A Direct Dilution ---
     if (direct_v1_uL >= minPipetteVol_uL) {
         let diluentVol_uL = finalVol_uL - direct_v1_uL;
-        // --- THIS IS THE FIX (for consistency) ---
         if (Math.abs(diluentVol_uL) < 1e-9) diluentVol_uL = 0;
         
-        resultHtml = `<p class="font-semibold text-green-800">A direct dilution is feasible.</p><p class="mt-2">To prepare your dose:</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your original stock.</li><li>Add <strong>${formatNumber(diluentVol_uL)} µL</strong> of diluent.</li></ul>`;
+        let resultHtml = `<p class="font-semibold text-green-800">A direct dilution is the most efficient method.</p>
+                          <p class="mt-2">To prepare your dose:</p>
+                          <ul class="list-disc list-inside mt-2 space-y-1">
+                            <li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your original stock.</li>`;
+        if (diluentVol_uL > 0) {
+            resultHtml += `<li>Add <strong>${formatNumber(diluentVol_uL)} µL</strong> of diluent.</li>`;
+        }
+         resultHtml += `<li class="text-sm text-slate-600">This gives you a final volume of ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li></ul>`;
         showResult('sd_result', resultHtml);
-    } else {
-        let protocolHtml = findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, 100, originalValues);
+        return; 
+    }
 
-        if (protocolHtml !== false) {
-            resultHtml = `<p class="font-semibold">A multi-step serial dilution is required:</p>` + protocolHtml;
-            showResult('sd_result', resultHtml);
-        } else {
-            let suggestedProtocolHtml = findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, 10, originalValues);
-            showError('sd_error', 'The standard 1:100 dilution factor is too large, creating an intermediate stock that is too dilute.');
+    // --- Strategy 2: The Next Best Case - An Ideal 2-Step Dilution ---
+    const V_inter_total_uL = 100;
+    const c_inter_max = (c2 * finalVol_uL) / minPipetteVol_uL;
+    
+    if (c_inter_max < c1) {
+        const c_inter = c_inter_max;
+        const v1_for_inter_uL = (c_inter * V_inter_total_uL) / c1;
+        
+        if (v1_for_inter_uL >= minPipetteVol_uL) {
+            const diluent_for_inter_uL = V_inter_total_uL - v1_for_inter_uL;
+            const v1_for_final_uL = (c2 * finalVol_uL) / c_inter;
+            let diluent_for_final_uL = finalVol_uL - v1_for_final_uL;
+            if (Math.abs(diluent_for_final_uL) < 1e-9) diluent_for_final_uL = 0;
 
-            if (suggestedProtocolHtml !== false) {
-                const finalHtml = `<p class="font-semibold mt-4 text-slate-800">Suggested Approach (using 1:10 dilutions):</p>` + suggestedProtocolHtml;
-                showResult('sd_result', finalHtml);
-            } else {
-                showError('sd_error', 'Cannot find a valid serial dilution protocol even with a 1:10 factor. Please check your inputs.');
+            let resultHtml = `<p class="font-semibold">The most efficient protocol is a 2-step dilution:</p>
+                <div class="mt-4"><p class="font-medium">Step 1: Prepare an Intermediate Stock (${formatConcentration(c_inter)})</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(v1_for_inter_uL)} µL</strong> of your original stock (${formatConcentration(c1)}).</li><li>Add <strong>${formatNumber(diluent_for_inter_uL)} µL</strong> of diluent.</li></ul></div>
+                <div class="mt-4"><p class="font-medium">Step 2: Prepare the Final Dose</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(v1_for_final_uL)} µL</strong> of your new intermediate stock.</li>`;
+            if (diluent_for_final_uL > 0) {
+                resultHtml += `<li>Add <strong>${formatNumber(diluent_for_final_uL)} µL</strong> of diluent.</li>`;
             }
+            resultHtml += `<li class="text-sm text-slate-600">This gives you ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li></ul></div>`;
+            showResult('sd_result', resultHtml);
+            return; 
         }
     }
+    
+    // --- Strategy 3: The Last Resort - Multi-Step Serial Dilution ---
+    const factorsToTry = [10, 100]; 
+    for (const factor of factorsToTry) {
+        const protocolHtml = findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, factor, originalValues);
+        if (protocolHtml !== false) {
+            let resultHtml = `<p class="font-semibold">A simple dilution is not practical. A multi-step protocol is required:</p>` + protocolHtml;
+            showResult('sd_result', resultHtml);
+            return;
+        }
+    }
+
+    showError('sd_error', 'Cannot find a practical dilution protocol with the given constraints. Your stock may be too concentrated or your minimum pipetting volume too high.');
 }
 
 /**********************************************
