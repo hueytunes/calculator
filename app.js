@@ -7,7 +7,7 @@ const massToBase = { 'g': 1, 'mg': 1e-3, 'µg': 1e-6, 'ng': 1e-9 };
 const molarToBase = { 'M': 1, 'mM': 1e-3, 'µM': 1e-6, 'nM': 1e-9 };
 const activityToBase = { 'IU/mL': 1, 'kIU/mL': 1000 };
 const massPerVolToBase = {
-    'g/L': 1, 'mg/mL': 1, 'µg/mL': 1e-3, 'ng/mL': 1e-6, 'ng/µL': 1
+    'g/L': 1, 'mg/mL': 1, 'µg/mL': 1e-3, 'ng/mL': 1e-6, 'ng/µL': 1e-3
 };
 
 /**********************************************
@@ -90,7 +90,7 @@ function formatConcentration(conc_mg_per_ml) {
         if (conc_ng_per_ml >= 1e6) { // If it's 1 mg/mL or more
              return formatNumber(conc_mg_per_ml) + ' mg/mL';
         }
-        return formatNumber(conc_mg_per_ml / 1000) + ' µg/mL';
+        return formatNumber(conc_mg_per_ml * 1000) + ' µg/mL';
     } else {
         return formatNumber(conc_ng_per_ml) + ' ng/mL';
     }
@@ -390,7 +390,7 @@ function calculateSerialDose() {
         volUnit: getEl('sd_final_vol_unit').value,
     };
     
-    const stockConcMap = { 'mg/mL': 1, 'µg/mL': 1e-3, 'g/L': 1, 'ng/mL': 1e-6 }; // Corrected ng/mL to be relative to mg/mL
+    const stockConcMap = { 'mg/mL': 1, 'µg/mL': 1e-3, 'g/L': 1, 'ng/mL': 1e-6, 'µg/µL': 1 }; // Corrected ng/mL to be relative to mg/mL
     const c1 = parseToBase(getEl('sd_stock_val').value, getEl('sd_stock_unit').value, stockConcMap, 'concentration');
     if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
 
@@ -459,6 +459,10 @@ function calculateSerialDose() {
     // --- Strategy 3: The Last Resort - Multi-Step Serial Dilution ---
     const factorsToTry = [10, 100]; 
     for (const factor of factorsToTry) {
+        // Add this check
+    if (100 / factor < minPipetteVol_uL) {
+        continue; // Skip this factor if the stock volume is too low
+    }
         const protocolHtml = findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, factor, originalValues);
         if (protocolHtml !== false) {
             let resultHtml = `<p class="font-semibold">A simple dilution is not practical. A multi-step protocol is required:</p>` + protocolHtml;
