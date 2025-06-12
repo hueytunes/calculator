@@ -131,7 +131,7 @@ function findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, factor, origi
         if (nextStockConc < c2) {
             return false;
         }
-        html += `<div class="mt-4"><p class="font-medium">Step ${stepCounter}: Prepare Intermediate Stock #${stepCounter} (${formatConcentration(nextStockConc)})</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(DILUTION_VOL_STOCK)} µL</strong> of your previous stock (${formatConcentration(currentStockConc)}).</li><li>Add <strong>${formatNumber(DILUTION_VOL_DILUENT)} µL</strong> of diluent (to make 100 µL total).</li></ul></div>`;
+        html += `<div class="mt-4"><p class="font-medium">Step ${stepCounter}: Prepare Intermediate Stock #${stepCounter} (${formatConcentration(nextStockConc)})</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatDoseNumber(DILUTION_VOL_STOCK)} µL</strong> of your previous stock (${formatConcentration(currentStockConc)}).</li><li>Add <strong>${formatDoseNumber(DILUTION_VOL_DILUENT)} µL</strong> of diluent (to make 100 µL total).</li></ul></div>`;
         currentStockConc = nextStockConc;
         stepCounter++;
         if (stepCounter > 5) return false;
@@ -144,7 +144,7 @@ function findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, factor, origi
     // If the diluent volume is a tiny floating-point residual, round to 0.
     if (Math.abs(final_diluent_uL) < 1e-9) final_diluent_uL = 0;
 
-    html += `<div class="mt-4"><p class="font-medium">Step ${stepCounter}: Prepare the Final Dose</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(final_v1_uL)} µL</strong> of the last intermediate stock (${formatConcentration(currentStockConc)}).</li><li>Add <strong>${formatNumber(final_diluent_uL)} µL</strong> of diluent.</li><li class="text-sm text-slate-600">This gives you a final volume of ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li></ul></div>`;
+    html += `<div class="mt-4"><p class="font-medium">Step ${stepCounter}: Prepare the Final Dose</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatDoseNumber(final_v1_uL)} µL</strong> of the last intermediate stock (${formatConcentration(currentStockConc)}).</li><li>Add <strong>${formatDoseNumber(final_diluent_uL)} µL</strong> of diluent.</li><li class="text-sm text-slate-600">This gives you a final volume of ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li></ul></div>`;
     return html;
 }
 
@@ -440,9 +440,9 @@ function calculateSerialDose() {
         let resultHtml = `<p class="font-semibold text-green-800">A direct dilution is the most efficient method.</p>
                           <p class="mt-2">To prepare your dose:</p>
                           <ul class="list-disc list-inside mt-2 space-y-1">
-                            <li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your original stock.</li>`;
+                            <li>Take <strong>${formatDoseNumber(direct_v1_uL)} µL</strong> of your original stock.</li>`;
         if (diluentVol_uL > 0) {
-            resultHtml += `<li>Add <strong>${formatNumber(diluentVol_uL)} µL</strong> of diluent.</li>`;
+            resultHtml += `<li>Add <strong>${formatDoseNumber(diluentVol_uL)} µL</strong> of diluent.</li>`;
         }
          resultHtml += `<li class="text-sm text-slate-600">This gives you a final volume of ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li></ul>`;
         showResult('sd_result', resultHtml);
@@ -464,10 +464,10 @@ function calculateSerialDose() {
             if (Math.abs(diluent_for_final_uL) < 1e-9) diluent_for_final_uL = 0;
 
             let resultHtml = `<p class="font-semibold">The most efficient protocol is a 2-step dilution:</p>
-                <div class="mt-4"><p class="font-medium">Step 1: Prepare an Intermediate Stock (${formatConcentration(c_inter)})</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(v1_for_inter_uL)} µL</strong> of your original stock (${formatConcentration(c1)}).</li><li>Add <strong>${formatNumber(diluent_for_inter_uL)} µL</strong> of diluent.</li></ul></div>
-                <div class="mt-4"><p class="font-medium">Step 2: Prepare the Final Dose</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(v1_for_final_uL)} µL</strong> of your new intermediate stock.</li>`;
+                <div class="mt-4"><p class="font-medium">Step 1: Prepare an Intermediate Stock (${formatConcentration(c_inter)})</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatDoseNumber(v1_for_inter_uL)} µL</strong> of your original stock (${formatConcentration(c1)}).</li><li>Add <strong>${formatDoseNumber(diluent_for_inter_uL)} µL</strong> of diluent.</li></ul></div>
+                <div class="mt-4"><p class="font-medium">Step 2: Prepare the Final Dose</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatDoseNumber(v1_for_final_uL)} µL</strong> of your new intermediate stock.</li>`;
             if (diluent_for_final_uL > 0) {
-                resultHtml += `<li>Add <strong>${formatNumber(diluent_for_final_uL)} µL</strong> of diluent.</li>`;
+                resultHtml += `<li>Add <strong>${formatDoseNumber(diluent_for_final_uL)} µL</strong> of diluent.</li>`;
             }
             resultHtml += `<li class="text-sm text-slate-600">This gives you ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li></ul></div>`;
             showResult('sd_result', resultHtml);
