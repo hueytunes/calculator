@@ -335,7 +335,7 @@ function calculateSerialDose() {
     if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
 
     // Final mass to mg
-    const finalMass_mg = parseToBase(getEl('sd_final_mass_val').value, getEl('sd_final_mass_unit').value, { 'g': 1000, 'mg': 1, 'µg': 1e-3 }, 'mass');
+    const finalMass_mg = parseToBase(getEl('sd_final_mass_val').value, getEl('sd_final_mass_unit').value, { 'g': 1000, 'mg': 1, 'µg': 1e-3, 'ng': 1e-6 }, 'mass');
     if (finalMass_mg.error) { showError('sd_error', finalMass_mg.error); return; }
 
     // Final volume to µL
