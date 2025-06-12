@@ -75,11 +75,6 @@ function formatNumber(num) {
     // This will format the number with up to 2 decimal places.
     return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
-
-/**
- * Parses a string that may contain scientific notation (e.g., '1.2e6' or '1.2x10^6')
- * @param {string} value - The input string from the user.
- * @returns {{error: string}|number} - The parsed number or an error object.
  /**
  * Parses a string that may contain scientific notation or common suffixes
  * like 'k' (thousand) or 'million'.
@@ -330,6 +325,87 @@ function calculateCellSeeding() {
     `);
 }
 
+function calculateSerialDose() {
+    hideAndClear(getEl('sd_result'));
+    hideAndClear(getEl('sd_error'));
+
+    // --- 1. Get and Parse All Inputs to Base Units ---
+    // Concentration to mg/mL (g/L and µg/µL are the same as mg/mL)
+    const c1 = parseScientific(getEl('sd_stock_val').value);
+    if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
+
+    // Final mass to mg
+    const finalMass_mg = parseToBase(getEl('sd_final_mass_val').value, getEl('sd_final_mass_unit').value, { 'g': 1000, 'mg': 1, 'µg': 1e-3 }, 'mass');
+    if (finalMass_mg.error) { showError('sd_error', finalMass_mg.error); return; }
+
+    // Final volume to µL
+    const finalVol_uL = parseToBase(getEl('sd_final_vol_val').value, getEl('sd_final_vol_unit').value, { 'mL': 1000, 'µL': 1 }, 'volume');
+    if (finalVol_uL.error) { showError('sd_error', finalVol_uL.error); return; }
+
+    // Min pipette volume to µL
+    const minPipetteVol_uL = parseScientific(getEl('sd_min_pipette_vol').value);
+    if (minPipetteVol_uL.error || minPipetteVol_uL <= 0) { showError('sd_error', 'Invalid Minimum Pipetting Volume.'); return; }
+    
+    // --- 2. Perform Core Calculations ---
+    // Final concentration required, in mg/mL (or µg/µL)
+    const c2 = finalMass_mg / (finalVol_uL / 1000); //  (finalVol_uL / 1000) converts µL to mL
+
+    if (c1 < c2) {
+        showError('sd_error', 'Stock Concentration cannot be less than the required Final Concentration.');
+        return;
+    }
+
+    // Calculate the volume needed for a direct dilution
+    const direct_v1_uL = (c2 * finalVol_uL) / c1;
+
+    let resultHtml = '';
+
+    // --- 3. Determine Strategy: Direct vs. Serial Dilution ---
+    if (direct_v1_uL >= minPipetteVol_uL) {
+        // Direct dilution is feasible
+        const diluentVol_uL = finalVol_uL - direct_v1_uL;
+        resultHtml = `
+            <p class="font-semibold text-green-800">A direct dilution is feasible.</p>
+            <p class="mt-2">To prepare your dose:</p>
+            <ul class="list-disc list-inside mt-2 space-y-1">
+                <li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your ${formatNumber(c1)} mg/mL stock.</li>
+                <li>Add <strong>${formatNumber(diluentVol_uL)} µL</strong> of diluent.</li>
+            </ul>
+        `;
+    } else {
+        // Serial dilution is required
+        const c_inter = c2 * (finalVol_uL / minPipetteVol_uL);
+        const v_inter_total_uL = 100; // Let's make 100 µL of intermediate stock
+        const v1_for_inter_uL = (c_inter * v_inter_total_uL) / c1;
+        const diluent_for_inter_uL = v_inter_total_uL - v1_for_inter_uL;
+        
+        const v_inter_for_final_uL = minPipetteVol_uL;
+        const diluent_for_final_uL = finalVol_uL - v_inter_for_final_uL;
+
+        resultHtml = `
+            <p class="font-semibold">Direct dilution requires pipetting an inaccurate volume (${formatNumber(direct_v1_uL)} µL). A two-step serial dilution is recommended.</p>
+            
+            <div class="mt-4">
+                <p class="font-medium">Step 1: Prepare an Intermediate Stock (${formatNumber(c_inter)} mg/mL)</p>
+                <ul class="list-disc list-inside mt-2 space-y-1">
+                    <li>Take <strong>${formatNumber(v1_for_inter_uL)} µL</strong> of your original ${formatNumber(c1)} mg/mL stock.</li>
+                    <li>Add <strong>${formatNumber(diluent_for_inter_uL)} µL</strong> of diluent.</li>
+                    <li class="text-sm text-slate-600">This creates ${formatNumber(v_inter_total_uL)} µL of a ${formatNumber(c_inter)} mg/mL intermediate stock.</li>
+                </ul>
+            </div>
+
+            <div class="mt-4">
+                <p class="font-medium">Step 2: Prepare the Final Dose</p>
+                <ul class="list-disc list-inside mt-2 space-y-1">
+                    <li>Take <strong>${formatNumber(v_inter_for_final_uL)} µL</strong> of your new intermediate stock.</li>
+                    <li>Add <strong>${formatNumber(diluent_for_final_uL)} µL</strong> of diluent.</li>
+                    <li class="text-sm text-slate-600">This gives you a final volume of ${formatNumber(finalVol_uL)} µL containing exactly ${formatNumber(finalMass_mg * 1000)} µg of the drug.</li>
+                </ul>
+            </div>
+        `;
+    }
+    showResult('sd_result', resultHtml);
+}
 
 /**********************************************
  * EVENT LISTENERS               *
@@ -367,6 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleFields();
     }
     
+    // --- Connect Dynamic Field Selectors ---
     setupDynamicFields(getEl('mvc_solve_for'), {
         mass: 'mvc_input_mass',
         volume: 'mvc_input_volume',
@@ -379,5 +456,16 @@ document.addEventListener('DOMContentLoaded', () => {
         molarity: 'mol_input_molarity'
     });
 
+    // --- Connect ALL Calculator Buttons ---
+    getEl('dilution-calculator').querySelector('button').addEventListener('click', calculateDilution);
+    getEl('molarity-calculator').querySelector('button').addEventListener('click', calculateMolarityCalc);
+    getEl('reconstitution-calculator').querySelector('button').addEventListener('click', calculateReconstitution);
+    getEl('mass-vol-conc-calculator').querySelector('button').addEventListener('click', calculateMVC);
+    getEl('cell-seeding-calculator').querySelector('button').addEventListener('click', calculateCellSeeding);
+    
+    // This connects your new button
+    getEl('calculate_sd_btn').addEventListener('click', calculateSerialDose);
+
+    // Activate the first tab on page load
     switchTab(tabs[0].dataset.target);
 });
