@@ -331,11 +331,14 @@ function calculateSerialDose() {
 
     // --- 1. Get and Parse All Inputs to Base Units ---
     // Concentration to mg/mL (g/L and µg/µL are the same as mg/mL)
-    const c1 = parseScientific(getEl('sd_stock_val').value);
-    if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
+    const stockConcMap = { 'mg/mL': 1, 'µg/µL': 1, 'g/L': 1, 'ng/mL': 1e-3 };
+const c1 = parseToBase(getEl('sd_stock_val').value, getEl('sd_stock_unit').value, stockConcMap, 'concentration');
+if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
 
     // Final mass to mg
-    const finalMass_mg = parseToBase(getEl('sd_final_mass_val').value, getEl('sd_final_mass_unit').value, { 'g': 1000, 'mg': 1, 'µg': 1e-3, 'ng': 1e-6 }, 'mass');
+    const finalMass_g = parseToBase(getEl('sd_final_mass_val').value, getEl('sd_final_mass_unit').value, massToBase, 'mass');
+if (finalMass_g.error) { showError('sd_error', finalMass_g.error); return; }
+const finalMass_mg = finalMass_g * 1000; // Convert from grams to mg for the function's math
     if (finalMass_mg.error) { showError('sd_error', finalMass_mg.error); return; }
 
     // Final volume to µL
