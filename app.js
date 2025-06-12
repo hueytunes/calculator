@@ -73,7 +73,26 @@ function formatNumber(num) {
         return num.toPrecision(3);
     }
 }
+/**
+ * Formats a number for the dosing calculator
+ * without using k/M suffixes for large numbers.
+ * @param {number} num - The number to format.
+ * @returns {string} - The formatted string.
+ */
+function formatDoseNumber(num) {
+    // Always handle the zero case first
+    if (num === 0) return '0';
 
+    const absNum = Math.abs(num);
+
+    // For very small numbers, use scientific notation for readability.
+    if (absNum > 0 && absNum < 1e-3) {
+        return num.toPrecision(3);
+    }
+
+    // For all other numbers, use standard formatting with commas and up to 4 decimal places.
+    return num.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
 /**
  * Formats a concentration value by automatically selecting the best units
  * (mg/mL, µg/mL, or ng/mL) to make the number readable.
