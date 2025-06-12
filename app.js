@@ -97,6 +97,55 @@ function formatConcentration(conc_mg_per_ml) {
     }
 }
 
+/**
+ * Tries to find a valid serial dilution protocol for a given dilution factor.
+ * @returns {string|false} - The HTML for the protocol, or false if impossible.
+ */
+function findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, factor, originalValues) {
+    let html = '';
+    let currentStockConc = c1;
+    let stepCounter = 1;
+    const DILUTION_VOL_STOCK = 100 / factor; // e.g., 1µL for 1:100, 10µL for 1:10
+    const DILUTION_VOL_DILUENT = 100 - DILUTION_VOL_STOCK;
+
+    while ((c2 * finalVol_uL) / currentStockConc < minPipetteVol_uL) {
+        let nextStockConc = currentStockConc / factor;
+        
+        // This is the check to see if the next step is possible
+        if (nextStockConc < c2) {
+            return false; // Impossible with this factor
+        }
+
+        html += `
+            <div class="mt-4">
+                <p class="font-medium">Step ${stepCounter}: Prepare Intermediate Stock #${stepCounter} (${formatConcentration(nextStockConc)})</p>
+                <ul class="list-disc list-inside mt-2 space-y-1">
+                    <li>Take <strong>${formatNumber(DILUTION_VOL_STOCK)} µL</strong> of your previous stock (${formatConcentration(currentStockConc)}).</li>
+                    <li>Add <strong>${formatNumber(DILUTION_VOL_DILUENT)} µL</strong> of diluent (to make 100 µL total).</li>
+                </ul>
+            </div>
+        `;
+        currentStockConc = nextStockConc;
+        stepCounter++;
+        if (stepCounter > 5) return false; // Safety break
+    }
+
+    const final_v1_uL = (c2 * finalVol_uL) / currentStockConc;
+    const final_diluent_uL = finalVol_uL - final_v1_uL;
+
+    html += `
+        <div class="mt-4">
+            <p class="font-medium">Step ${stepCounter}: Prepare the Final Dose</p>
+            <ul class="list-disc list-inside mt-2 space-y-1">
+                <li>Take <strong>${formatNumber(final_v1_uL)} µL</strong> of the last intermediate stock (${formatConcentration(currentStockConc)}).</li>
+                <li>Add <strong>${formatNumber(final_diluent_uL)} µL</strong> of diluent.</li>
+                <li class="text-sm text-slate-600">This gives you a final volume of ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li>
+            </ul>
+        </div>
+    `;
+    return html;
+}
+
  /**
  * Parses a string that may contain scientific notation or common suffixes
  * like 'k' (thousand) or 'million'.
@@ -351,20 +400,22 @@ function calculateSerialDose() {
     hideAndClear(getEl('sd_result'));
     hideAndClear(getEl('sd_error'));
 
-    const originalFinalMassVal = getEl('sd_final_mass_val').value;
-    const originalFinalMassUnit = getEl('sd_final_mass_unit').value;
-    const originalFinalVolVal = getEl('sd_final_vol_val').value;
-    const originalFinalVolUnit = getEl('sd_final_vol_unit').value;
+    const originalValues = {
+        massVal: getEl('sd_final_mass_val').value,
+        massUnit: getEl('sd_final_mass_unit').value,
+        volVal: getEl('sd_final_vol_val').value,
+        volUnit: getEl('sd_final_vol_unit').value
+    };
     
     const stockConcMap = { 'mg/mL': 1, 'µg/µL': 1, 'g/L': 1, 'ng/mL': 1e-3 };
     const c1 = parseToBase(getEl('sd_stock_val').value, getEl('sd_stock_unit').value, stockConcMap, 'concentration');
     if (c1.error || c1 <= 0) { showError('sd_error', 'Invalid Stock Concentration.'); return; }
 
-    const finalMass_g = parseToBase(originalFinalMassVal, originalFinalMassUnit, massToBase, 'mass');
+    const finalMass_g = parseToBase(originalValues.massVal, originalValues.massUnit, massToBase, 'mass');
     if (finalMass_g.error) { showError('sd_error', finalMass_g.error); return; }
     const finalMass_mg = finalMass_g * 1000;
 
-    const finalVol_uL = parseToBase(originalFinalVolVal, originalFinalVolUnit, { 'mL': 1000, 'µL': 1 }, 'volume');
+    const finalVol_uL = parseToBase(originalValues.volVal, originalValues.volUnit, { 'mL': 1000, 'µL': 1 }, 'volume');
     if (finalVol_uL.error) { showError('sd_error', finalVol_uL.error); return; }
 
     const minPipetteVol_uL = parseScientific(getEl('sd_min_pipette_vol').value);
@@ -378,68 +429,34 @@ function calculateSerialDose() {
     }
 
     let direct_v1_uL = (c2 * finalVol_uL) / c1;
-    let resultHtml = '';
     
     if (direct_v1_uL >= minPipetteVol_uL) {
         const diluentVol_uL = finalVol_uL - direct_v1_uL;
-        resultHtml = `<p class="font-semibold text-green-800">A direct dilution is feasible.</p><p class="mt-2">To prepare your dose:</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your original stock.</li><li>Add <strong>${formatNumber(diluentVol_uL)} µL</strong> of diluent.</li></ul>`;
+        const resultHtml = `<p class="font-semibold text-green-800">A direct dilution is feasible.</p><p class="mt-2">To prepare your dose:</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(direct_v1_uL)} µL</strong> of your original stock.</li><li>Add <strong>${formatNumber(diluentVol_uL)} µL</strong> of diluent.</li></ul>`;
+        showResult('sd_result', resultHtml);
     } else {
-        // --- NEW, SMARTER LOGIC ---
-        // First, try to make an intermediate stock at the exact final concentration
-        let c_inter = c2;
-        let v_inter_total_uL = 100; // Let's make a good volume
-        let v1_for_inter_uL = (c_inter * v_inter_total_uL) / c1;
+        // First, try the standard 1:100 dilution factor.
+        let protocolHtml = findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, 100, originalValues);
 
-        if (v1_for_inter_uL >= minPipetteVol_uL) {
-            // This is the ideal 2-step protocol that the user suggested
-            let diluent_for_inter_uL = v_inter_total_uL - v1_for_inter_uL;
-            resultHtml = `
-                <p class="font-semibold">A simple two-step dilution is recommended.</p>
-                <div class="mt-4">
-                    <p class="font-medium">Step 1: Prepare an Intermediate Stock (${formatConcentration(c_inter)})</p>
-                    <ul class="list-disc list-inside mt-2 space-y-1">
-                        <li>Take <strong>${formatNumber(v1_for_inter_uL)} µL</strong> of your original stock (${formatConcentration(c1)}).</li>
-                        <li>Add <strong>${formatNumber(diluent_for_inter_uL)} µL</strong> of diluent.</li>
-                    </ul>
-                </div>
-                <div class="mt-4">
-                    <p class="font-medium">Step 2: Prepare the Final Dose</p>
-                    <ul class="list-disc list-inside mt-2 space-y-1">
-                        <li>Take <strong>${originalFinalVolVal} ${originalFinalVolUnit}</strong> of your new intermediate stock.</li>
-                        <li class="text-sm text-slate-600">This aliquot contains your final dose of <strong>${originalFinalMassVal} ${originalFinalMassUnit}</strong>.</li>
-                    </ul>
-                </div>
-            `;
+        if (protocolHtml !== false) {
+            const resultHtml = `<p class="font-semibold">A multi-step serial dilution is required:</p>` + protocolHtml;
+            showResult('sd_result', resultHtml);
         } else {
-            // Fallback to multi-step dilution ONLY if the simple 2-step is not possible
-            resultHtml = `<p class="font-semibold">Direct dilution is inaccurate. A multi-step serial dilution is required:</p>`;
-            let currentStockConc = c1;
-            let stepCounter = 1;
-            let dilutionStepsHtml = '';
-            const DILUTION_FACTOR = 100;
-            const DILUTION_VOL_STOCK = 2;
-            const DILUTION_VOL_DILUENT = 198;
+            // If 1:100 fails, try the 1:10 factor as a suggestion.
+            let suggestedProtocolHtml = findSerialProtocol(c1, c2, finalVol_uL, minPipetteVol_uL, 10, originalValues);
 
-            while ((c2 * finalVol_uL) / currentStockConc < minPipetteVol_uL) {
-                let nextStockConc = currentStockConc / DILUTION_FACTOR;
-                if (nextStockConc < c2 && (c2 * finalVol_uL) / nextStockConc > finalVol_uL) {
-                    showError('sd_error', `The dilution factor is too large, creating an intermediate stock that is too dilute. Try a smaller factor like 1:10.`);
-                    return;
-                }
-                dilutionStepsHtml += `<div class="mt-4"><p class="font-medium">Step ${stepCounter}: Prepare Intermediate Stock #${stepCounter} (${formatConcentration(nextStockConc)})</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${DILUTION_VOL_STOCK} µL</strong> of your previous stock (${formatConcentration(currentStockConc)}).</li><li>Add <strong>${DILUTION_VOL_DILUENT} µL</strong> of diluent.</li></ul></div>`;
-                currentStockConc = nextStockConc;
-                stepCounter++;
-                if (stepCounter > 5) { showError('sd_error', 'Dilution requires more than 5 steps. Check inputs.'); return; }
+            // Show the error message explaining why we need the suggestion.
+            showError('sd_error', 'The standard 1:100 dilution factor is too large, creating an intermediate stock that is too dilute.');
+
+            if (suggestedProtocolHtml !== false) {
+                const finalHtml = `<p class="font-semibold mt-4 text-slate-800">Suggested Approach (using 1:10 dilutions):</p>` + suggestedProtocolHtml;
+                showResult('sd_result', finalHtml);
+            } else {
+                // If even 1:10 fails, then it's a hard error.
+                showError('sd_error', 'Cannot find a valid serial dilution protocol even with a 1:10 factor. Please check your inputs.');
             }
-            
-            const final_v1_uL = (c2 * finalVol_uL) / currentStockConc;
-            const final_diluent_uL = finalVol_uL - final_v1_uL;
-
-            dilutionStepsHtml += `<div class="mt-4"><p class="font-medium">Step ${stepCounter}: Prepare the Final Dose</p><ul class="list-disc list-inside mt-2 space-y-1"><li>Take <strong>${formatNumber(final_v1_uL)} µL</strong> of Intermediate Stock #${stepCounter - 1} (${formatConcentration(currentStockConc)}).</li><li>Add <strong>${formatNumber(final_diluent_uL)} µL</strong> of diluent.</li><li class="text-sm text-slate-600">This gives you a final volume of ${originalFinalVolVal} ${originalFinalVolUnit} containing exactly <strong>${originalFinalMassVal} ${originalFinalMassUnit}</strong> of the drug.</li></ul></div>`;
-            resultHtml += dilutionStepsHtml;
         }
     }
-    showResult('sd_result', resultHtml);
 }
 
 /**********************************************
