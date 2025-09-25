@@ -1,14 +1,14 @@
 import { getEl, querySelAll } from './utils.js';
-import { switchTab, setupDynamicFields, setupPlateSeedingUI, setupSeedingUI, setupSerialProUI, setupTheme } from './ui.js';
+import { switchTab, setupDynamicFields, setupPlateSeedingUI, setupTheme } from './ui.js';
 import {
     calculateDilution,
     calculateMolarityCalc,
     calculateReconstitution,
     calculateMVC,
-    
+    calculateCellSeeding,
     calculateSerialDose,
-    calculateSeedingUnified
-} , calculateSeedingUnified } , calculateSerialDilutionPro } from './calculators.js';
+    calculatePlateSeeding
+} from './calculators.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const tabs = querySelAll('.tab');
@@ -35,16 +35,14 @@ document.addEventListener('DOMContentLoaded', () => {
     getEl('molarity-calculator').querySelector('button').addEventListener('click', calculateMolarityCalc);
     getEl('reconstitution-calculator').querySelector('button').addEventListener('click', calculateReconstitution);
     getEl('mass-vol-conc-calculator').querySelector('button').addEventListener('click', calculateMVC);
+    getEl('cell-seeding-calculator').querySelector('button').addEventListener('click', calculateCellSeeding);
+
     // This connects your new button
     getEl('calculate_sd_btn').addEventListener('click', calculateSerialDose);
-    const seedBtn = getEl('calculate_seeding_btn'); if (seedBtn) seedBtn.addEventListener('click', calculateSeedingUnified);
-    const sdproBtn = getEl('calculate_sdpro_btn'); if (sdproBtn) sdproBtn.addEventListener('click', calculateSerialDilutionPro);
-    getEl('calculate_ps_btn').addEventListener('click');
+    getEl('calculate_ps_btn').addEventListener('click', calculatePlateSeeding);
 
     // Setup UI handlers
     setupPlateSeedingUI();
-    setupSeedingUI();
-    setupSerialProUI();
     setupTheme();
 
     // Activate the first tab on page load

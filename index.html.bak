@@ -286,80 +286,15 @@
         </div>
         
         <!-- CELL SEEDING CALCULATOR -->
-        <!-- UNIFIED SEEDING CALCULATOR -->
-<div id="seeding-calculator" class="calculator-section space-y-4">
-  <h3 class="text-xl font-semibold text-slate-900 dark:text-white">Cell & Plate Seeding Calculator</h3>
-  <p class="text-sm text-slate-600 dark:text-slate-400">
-    Prepare cell suspensions (C1V1) or a plate-seeding master mix with one tool.
-  </p>
-
-  <!-- Mode selector -->
-  <div>
-    <label for="seed_mode" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Mode</label>
-    <select id="seed_mode" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-      <option value="simple">Simple: C1V1 (cells/mL × mL)</option>
-      <option value="plate">Plate Master Mix</option>
-    </select>
-  </div>
-
-  <!-- Simple (C1V1) sub-form -->
-  <div id="seed_simple_form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div>
-      <label for="cs_stock_conc" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Stock Cell Concentration (cells/mL)</label>
-      <input type="text" id="cs_stock_conc" placeholder="e.g. 1e7" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="cs_final_conc" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Desired Final Concentration (cells/mL)</label>
-      <input type="text" id="cs_final_conc" placeholder="e.g. 5e5" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="cs_final_vol" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Final Volume (mL)</label>
-      <input type="text" id="cs_final_vol" placeholder="e.g. 10" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-  </div>
-
-  <!-- Plate Master Mix sub-form -->
-  <div id="seed_plate_form" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
-    <div>
-      <label for="ps_plate_type" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Plate Type</label>
-      <select id="ps_plate_type" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-        <option value="6-well">6-Well Plate</option>
-        <option value="12-well">12-Well Plate</option>
-        <option value="24-well">24-Well Plate</option>
-        <option value="48-well">48-Well Plate</option>
-        <option value="96-well">96-Well Plate</option>
-        <option value="custom">Custom</option>
-      </select>
-    </div>
-    <div>
-      <label for="ps_wells_to_seed" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Number of Wells to Seed</label>
-      <input type="text" id="ps_wells_to_seed" placeholder="e.g. 12" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="ps_seeding_density" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Seeding Density (cells/cm²)</label>
-      <input type="text" id="ps_seeding_density" placeholder="e.g. 5e4" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="ps_stock_conc" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Stock Cell Concentration (cells/mL)</label>
-      <input type="text" id="ps_stock_conc" placeholder="e.g. 1e7" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="ps_well_volume" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Volume per Well (mL)</label>
-      <input type="text" id="ps_well_volume" placeholder="e.g. 0.2" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div id="ps_custom_inputs" class="hidden">
-      <label for="ps_well_area" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Well Area (cm²)</label>
-      <input type="text" id="ps_well_area" placeholder="e.g. 0.32" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-  </div>
-
-  <div class="pt-2">
-    <button id="calculate_seeding_btn" class="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Calculate</button>
-  </div>
-
-  <div id="seed_error" class="text-red-600 dark:text-red-500 mt-2"></div>
-  <div id="seed_result" class="hidden mt-3 p-4 rounded-md bg-indigo-50 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300"></div>
-</div><div>
+        <div id="cell-seeding-calculator" class="calculator-section space-y-4">
+             <h3 class="text-xl font-semibold text-slate-900 dark:text-white">Cell Seeding Calculator</h3>
+             <p class="text-sm text-slate-600 dark:text-slate-400">Calculate the volume of cell stock and media needed to seed a new culture at a desired density.</p>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="cs_stock_conc" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Stock Cell Concentration (cells/mL)</label>
+                    <input type="text" id="cs_stock_conc" placeholder="e.g. 2e6 or 2x10^6" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                </div>
+                <div>
                     <label for="cs_final_conc" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Desired Final Concentration (cells/mL)</label>
                     <input type="text" id="cs_final_conc" placeholder="e.g. 250000 or 2.5e5" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                 </div>
@@ -432,7 +367,24 @@
 </div>
 
 <!-- PLATE SEEDING CALCULATOR -->
-<div>
+<div id="plate-seeding-calculator" class="calculator-section space-y-4">
+    <h3 class="text-xl font-semibold text-slate-900 dark:text-white">Plate Seeding Master Mix Calculator</h3>
+    <p class="text-sm text-slate-600 dark:text-slate-400">Calculate a master mix for seeding cells across multiple wells of a plate.</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label for="ps_plate_type" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Plate Type</label>
+            <select id="ps_plate_type" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <option value="6-well">6-Well Plate</option>
+                <option value="12-well">12-Well Plate</option>
+                <option value="24-well">24-Well Plate</option>
+                <option value="48-well">48-Well Plate</option>
+                <option value="96-well" selected>96-Well Plate</option>
+                <option value="384-well">384-Well Plate</option>
+                <option value="custom">Custom</option>
+            </select>
+        </div>
+        <div>
             <label for="ps_wells_to_seed" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Number of Wells to Seed</label>
             <input type="text" id="ps_wells_to_seed" placeholder="e.g. 12" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
         </div>
@@ -465,177 +417,6 @@
 </div>
       </div>
     </div>
-  <!-- ADVANCED SERIAL DILUTION & DOSING -->
-<div id="serial-pro" class="calculator-section space-y-4">
-  <h3 class="text-xl font-semibold text-slate-900 dark:text-white">Advanced Serial Dilution & Dosing</h3>
-  <p class="text-sm text-slate-600 dark:text-slate-400">
-    Build multi-step dilution plans (with optional intermediate stocks), convert between mass/volume and molar units, and optimize for pipetting constraints.
-  </p>
-
-  <!-- Source concentration -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div>
-      <label for="sdpro_source_val" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Source Concentration</label>
-      <input id="sdpro_source_val" type="text" placeholder="e.g. 60" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_source_unit" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Source Unit</label>
-      <select id="sdpro_source_unit" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-        <option value="mg/mL">mg/mL</option>
-        <option value="µg/µL">µg/µL</option>
-        <option value="g/L">g/L</option>
-        <option value="M">M</option>
-        <option value="mM">mM</option>
-        <option value="µM">µM</option>
-      </select>
-    </div>
-    <div>
-      <label for="sdpro_mw" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Molecular Weight (g/mol) – required if converting mass↔molar</label>
-      <input id="sdpro_mw" type="text" placeholder="e.g. 300.24" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-  </div>
-
-  <!-- Mode selection -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div>
-      <label for="sdpro_mode" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Mode</label>
-      <select id="sdpro_mode" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-        <option value="single">Single Final Solution</option>
-        <option value="intermediate">Intermediate Stock → Final</option>
-        <option value="series_list">Series: Specific Targets</option>
-        <option value="series_factor">Series: Factor & Steps</option>
-      </select>
-    </div>
-    <div>
-      <label for="sdpro_overage" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Overage (%)</label>
-      <input id="sdpro_overage" type="text" value="10" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-  </div>
-
-  <!-- Target panels -->
-  <div id="sdpro_panel_single" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div>
-      <label for="sdpro_target_val" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Target Concentration</label>
-      <input id="sdpro_target_val" type="text" placeholder="e.g. 100" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_target_unit" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Target Unit</label>
-      <select id="sdpro_target_unit" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-        <option value="mg/mL">mg/mL</option>
-        <option value="µg/µL">µg/µL</option>
-        <option value="g/L">g/L</option>
-        <option value="M">M</option>
-        <option value="mM">mM</option>
-        <option value="µM">µM</option>
-      </select>
-    </div>
-    <div>
-      <label for="sdpro_final_vol_ml" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Final Volume (mL)</label>
-      <input id="sdpro_final_vol_ml" type="text" placeholder="e.g. 10" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-  </div>
-
-  <div id="sdpro_panel_intermediate" class="grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
-    <div>
-      <label for="sdpro_intermediate_val" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Intermediate Concentration</label>
-      <input id="sdpro_intermediate_val" type="text" placeholder="e.g. 4" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_intermediate_unit" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Intermediate Unit</label>
-      <select id="sdpro_intermediate_unit" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-        <option value="mg/mL">mg/mL</option>
-        <option value="µg/µL">µg/µL</option>
-        <option value="g/L">g/L</option>
-        <option value="M">M</option>
-        <option value="mM">mM</option>
-        <option value="µM">µM</option>
-      </select>
-    </div>
-    <div>
-      <label for="sdpro_intermediate_vol_ml" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Intermediate Volume (mL)</label>
-      <input id="sdpro_intermediate_vol_ml" type="text" placeholder="e.g. 2" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_target2_val" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Final Target (after intermediate)</label>
-      <input id="sdpro_target2_val" type="text" placeholder="e.g. 100" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_target2_unit" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Final Unit</label>
-      <select id="sdpro_target2_unit" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-        <option value="mg/mL">mg/mL</option>
-        <option value="µg/µL">µg/µL</option>
-        <option value="g/L">g/L</option>
-        <option value="M">M</option>
-        <option value="mM">mM</option>
-        <option value="µM">µM</option>
-      </select>
-    </div>
-    <div>
-      <label for="sdpro_target2_vol_ml" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Final Volume (mL)</label>
-      <input id="sdpro_target2_vol_ml" type="text" placeholder="e.g. 10" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-  </div>
-
-  <div id="sdpro_panel_series_list" class="space-y-2 hidden">
-    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Target Concentrations (comma-separated)</label>
-    <input id="sdpro_series_vals" type="text" placeholder="e.g. 100, 50, 25, 12.5" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label for="sdpro_series_unit" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Unit</label>
-        <select id="sdpro_series_unit" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-          <option value="mg/mL">mg/mL</option>
-          <option value="µg/µL">µg/µL</option>
-          <option value="g/L">g/L</option>
-          <option value="M">M</option>
-          <option value="mM">mM</option>
-          <option value="µM">µM</option>
-        </select>
-      </div>
-      <div>
-        <label for="sdpro_series_vol_ml" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Volume per Tube (mL)</label>
-        <input id="sdpro_series_vol_ml" type="text" placeholder="e.g. 1" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-      </div>
-    </div>
-  </div>
-
-  <div id="sdpro_panel_series_factor" class="grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
-    <div>
-      <label for="sdpro_factor" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Dilution Factor per Step (e.g., 2, 3, 4, 5, 10)</label>
-      <input id="sdpro_factor" type="text" placeholder="e.g. 10" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_steps" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Number of Steps</label>
-      <input id="sdpro_steps" type="text" placeholder="e.g. 3" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_series2_vol_ml" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Volume per Tube (mL)</label>
-      <input id="sdpro_series2_vol_ml" type="text" placeholder="e.g. 1" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-  </div>
-
-  <!-- Constraints -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div>
-      <label for="sdpro_min_pip_ul" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Min Pipet Volume (µL)</label>
-      <input id="sdpro_min_pip_ul" type="text" value="2" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_max_pip_ul" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Max Pipet Volume (µL)</label>
-      <input id="sdpro_max_pip_ul" type="text" value="1000" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-    <div>
-      <label for="sdpro_preferred_factors" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Preferred Factors (comma-separated)</label>
-      <input id="sdpro_preferred_factors" type="text" value="10,5,4,3,2" class="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-    </div>
-  </div>
-
-  <div class="pt-2">
-    <button id="calculate_sdpro_btn" class="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Build Plan</button>
-  </div>
-
-  <div id="sdpro_error" class="text-red-600 dark:text-red-500 mt-2"></div>
-  <div id="sdpro_result" class="hidden mt-3 p-4 rounded-md bg-indigo-50 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300"></div>
-</div>
   </main>
   
   <footer class="text-center p-4 mt-8 text-sm text-slate-500 dark:text-slate-400">
