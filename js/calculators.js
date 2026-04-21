@@ -1,389 +1,337 @@
+/* ==========================================================================
+   calculators.js — pure math functions, DOM-free.
+   Each function takes a plain-object spec and returns either a result
+   object or { error: '...' }. Screen modules consume and render the
+   results; they never parse inputs in this file.
+
+   Base units (internal):
+     volume      → L
+     mass        → g
+     molar conc  → M
+     mass/vol    → mg/mL  (numerically equal to g/L)
+     activity    → IU/mL
+   ========================================================================== */
+
 import {
-    parseConcentration,
-    parseToBase,
-    formatNumber,
-    getEl,
-    volumeToBase,
-    massToBase,
-    molarToBase,
-    massPerVolToBase,
-    parseScientific,
-    formatDoseNumber,
-    formatConcentration
+  parseNumber, parseToBase, parseConcentration,
+  volumeToBase, massToBase, molarToBase, massPerVolToBase,
 } from './utils.js';
 
-import { showResult, showError } from './ui.js';
+/* ---------------------------------------------------------------------------
+   1. Dilution — C1V1 = C2V2
+   --------------------------------------------------------------------------*/
+export function computeDilution({ stockVal, stockUnit, finalVal, finalUnit, volVal, volUnit }) {
+  const stock = parseConcentration(stockVal, stockUnit);
+  if (stock.error) return stock;
+  const final = parseConcentration(finalVal, finalUnit);
+  if (final.error) return final;
+  const finalVol = parseToBase(volVal, volUnit, volumeToBase, 'volume');
+  if (finalVol.error) return finalVol;
 
-/**********************************************
- * CALCULATOR LOGIC                 *
- **********************************************/
+  if (stock.type !== final.type) {
+    return { error: 'Stock and final concentration must be the same type (both molar, both mass/vol, etc.).' };
+  }
+  if (stock.value === 0) return { error: 'Stock concentration cannot be zero.' };
+  if (stock.value < final.value) return { error: 'Stock concentration cannot be less than the final concentration.' };
 
-export function calculateDilution() {
-    const resultEl = getEl('dil_result');
-    const errorEl = getEl('dil_error');
-    resultEl.classList.add('hidden');
-    errorEl.textContent = '';
+  const stockVolL = (final.value * finalVol) / stock.value;
+  const diluentVolL = finalVol - stockVolL;
 
-    const stockConc = parseConcentration(getEl('dil_stock_val').value, getEl('dil_stock_unit').value);
-    const finalConc = parseConcentration(getEl('dil_final_val').value, getEl('dil_final_unit').value);
-    const finalVol = parseToBase(getEl('dil_final_vol').value, getEl('dil_vol_unit').value, volumeToBase, 'volume');
-
-    if (stockConc.error) { showError(errorEl, stockConc.error); return; }
-    if (finalConc.error) { showError(errorEl, finalConc.error); return; }
-    if (finalVol.error) { showError(errorEl, finalVol.error); return; }
-
-    if (stockConc.type !== finalConc.type) {
-        showError(errorEl, 'Stock and final concentration must be of the same type (e.g., both molar, both mass/vol, or both activity).');
-        return;
-    }
-    if (stockConc.value < finalConc.value) {
-        showError(errorEl, 'Stock concentration cannot be less than the final concentration.');
-        return;
-    }
-    if(stockConc.value === 0) {
-        showError(errorEl, 'Stock concentration cannot be zero.');
-        return;
-    }
-
-    const stockVolNeeded = (finalConc.value * finalVol) / stockConc.value;
-    const diluentVol = finalVol - stockVolNeeded;
-
-    showResult(resultEl, `
-        <p class="font-semibold">To prepare ${getEl('dil_final_vol').value} ${getEl('dil_vol_unit').value} of solution:</p>
-        <ul class="list-disc list-inside mt-2 space-y-1">
-            <li>Take <strong>${formatNumber(stockVolNeeded * 1e3)} mL</strong> (or ${formatNumber(stockVolNeeded * 1e6)} µL) of your stock solution.</li>
-            <li>Add <strong>${formatNumber(diluentVol * 1e3)} mL</strong> (or ${formatNumber(diluentVol * 1e6)} µL) of diluent.</li>
-        </ul>
-    `);
+  return {
+    stockVolL,
+    diluentVolL,
+    finalVolL: finalVol,
+    userFinalVolUnit: volUnit,
+  };
 }
 
-export function calculateMolarityCalc() {
-    const resultEl = getEl('mol_calc_result');
-    const errorEl = getEl('mol_calc_error');
-    resultEl.classList.add('hidden');
-    errorEl.textContent = '';
-    const solveFor = getEl('mol_calc_solve_for').value;
+/* ---------------------------------------------------------------------------
+   2. Concentration — merged Molarity + Mass/Vol/Conc.
+   Solve for one of mass / volume / concentration, given the other two.
+   MW is required only when a molar concentration unit is selected.
+   --------------------------------------------------------------------------*/
+export function computeConcentration({ solveFor, mw, massVal, massUnit, volVal, volUnit, concVal, concUnit }) {
+  let massG = null;
+  let volL = null;
+  let parsedConc = null;
 
-    const mw = parseScientific(getEl('mol_calc_mw').value);
-    if (mw.error || mw <= 0) {
-        showError(errorEl, 'Molecular Weight (MW) must be a positive number.');
-        return;
+  if (solveFor !== 'mass') {
+    const m = parseToBase(massVal, massUnit, massToBase, 'mass');
+    if (m.error) return m;
+    massG = m;
+  }
+  if (solveFor !== 'volume') {
+    const v = parseToBase(volVal, volUnit, volumeToBase, 'volume');
+    if (v.error) return v;
+    volL = v;
+  }
+  if (solveFor !== 'concentration') {
+    const c = parseConcentration(concVal, concUnit);
+    if (c.error) return c;
+    parsedConc = c;
+    // If molar, need MW to bridge to mass
+    if (c.type === 'molar') {
+      const mwN = parseNumber(mw);
+      if (mwN && mwN.error) return { error: 'Molecular weight is required for molar concentrations.' };
+      if (mwN <= 0) return { error: 'Molecular weight must be greater than zero.' };
     }
+  }
 
-    const mass = parseToBase(getEl('mol_calc_mass_val').value, getEl('mol_calc_mass_unit').value, massToBase, 'mass');
-    const vol = parseToBase(getEl('mol_calc_volume_val').value, getEl('mol_calc_volume_unit').value, volumeToBase, 'volume');
-    const molarity = parseToBase(getEl('mol_calc_molar_val').value, getEl('mol_calc_molar_unit').value, molarToBase, 'molarity');
-
-    let resultHtml = '';
-    try {
-        if (solveFor === 'mass') {
-            if (vol.error) throw new Error(vol.error);
-            if (molarity.error) throw new Error(molarity.error);
-            const massG = molarity * vol * mw;
-            resultHtml = `<p>Required Mass: <strong>${formatNumber(massG * 1000)} mg</strong> (or ${formatNumber(massG)} g)</p>`;
-        } else if (solveFor === 'volume') {
-            if (mass.error) throw new Error(mass.error);
-            if (molarity.error) throw new Error(molarity.error);
-            const volL = mass / (molarity * mw);
-            resultHtml = `<p>Required Volume: <strong>${formatNumber(volL * 1000)} mL</strong> (or ${formatNumber(volL * 1e6)} µL)</p>`;
-        } else if (solveFor === 'molarity') {
-            if (mass.error) throw new Error(mass.error);
-            if (vol.error) throw new Error(vol.error);
-            const molarityM = mass / (vol * mw);
-            resultHtml = `<p>Resulting Molarity: <strong>${formatNumber(molarityM * 1000)} mM</strong> (or ${formatNumber(molarityM)} M)</p>`;
-        }
-        showResult(resultEl, resultHtml);
-    } catch (e) {
-        showError(errorEl, e.message);
+  // When user requests a molar-unit target for "solve for concentration",
+  // we need MW to convert from mass/vol to molarity.
+  if (solveFor === 'concentration') {
+    if (molarToBase[concUnit] !== undefined) {
+      const mwN = parseNumber(mw);
+      if (mwN && mwN.error) return { error: 'Molecular weight is required for molar concentrations.' };
+      if (mwN <= 0) return { error: 'Molecular weight must be greater than zero.' };
     }
+  }
+
+  const mwN = (typeof mw === 'number') ? mw : parseFloat(mw);
+
+  if (solveFor === 'mass') {
+    // mass = conc × vol  (convert molar → mass/vol via MW if needed)
+    if (parsedConc.type === 'molar') {
+      // M × L × g/mol = g
+      massG = parsedConc.value * volL * mwN;
+    } else if (parsedConc.type === 'massvol' || parsedConc.type === 'percent-wv' || parsedConc.type === 'percent-ww') {
+      // mg/mL × L = 1e3 mg/L × L... actually: base for parsedConc is mg/mL.
+      // mass in g = conc(mg/mL) × vol(L) × 1000 mL/L / 1000 mg/g = conc × vol
+      massG = parsedConc.value * volL;
+    } else {
+      return { error: 'This concentration type cannot be used to solve for mass.' };
+    }
+    return { solved: 'mass', massG };
+  }
+
+  if (solveFor === 'volume') {
+    if (parsedConc.type === 'molar') {
+      // vol(L) = mass(g) / (molar × MW)
+      volL = massG / (parsedConc.value * mwN);
+    } else if (parsedConc.type === 'massvol' || parsedConc.type === 'percent-wv' || parsedConc.type === 'percent-ww') {
+      if (parsedConc.value === 0) return { error: 'Concentration cannot be zero.' };
+      volL = massG / parsedConc.value;
+    } else {
+      return { error: 'This concentration type cannot be used to solve for volume.' };
+    }
+    return { solved: 'volume', volL };
+  }
+
+  if (solveFor === 'concentration') {
+    if (volL === 0) return { error: 'Volume cannot be zero.' };
+    // Requesting molar output → use MW
+    if (molarToBase[concUnit] !== undefined) {
+      // M = g / (L × g/mol)
+      const molarityM = massG / (volL * mwN);
+      return { solved: 'concentration', outType: 'molar', valueBase: molarityM, outUnit: concUnit };
+    }
+    // Requesting mass/vol → value in mg/mL
+    if (massPerVolToBase[concUnit] !== undefined) {
+      const mgPerMl = massG / volL; // g / L  = mg/mL numerically
+      return { solved: 'concentration', outType: 'massvol', valueBase: mgPerMl, outUnit: concUnit };
+    }
+    if (concUnit === '% w/v') {
+      const mgPerMl = massG / volL;
+      return { solved: 'concentration', outType: 'percent-wv', valueBase: mgPerMl, outUnit: concUnit };
+    }
+    return { error: `Unsupported output unit: ${concUnit}.` };
+  }
 }
 
-export function calculateReconstitution() {
-    const resultEl = getEl('recon_result');
-    const errorEl = getEl('recon_error');
-    resultEl.classList.add('hidden');
-    errorEl.textContent = '';
+/* ---------------------------------------------------------------------------
+   3. Reconstitution — mass in vial + desired conc → volume of solvent
+   --------------------------------------------------------------------------*/
+export function computeReconstitution({ massVal, massUnit, concVal, concUnit, mw }) {
+  const massG = parseToBase(massVal, massUnit, massToBase, 'mass');
+  if (massG.error) return massG;
+  const desired = parseConcentration(concVal, concUnit);
+  if (desired.error) return desired;
 
-    const mass = parseToBase(getEl('recon_mass_val').value, getEl('recon_mass_unit').value, massToBase, 'mass');
-    const desiredConc = parseConcentration(getEl('recon_conc_val').value, getEl('recon_conc_unit').value);
+  let volL;
+  if (desired.type === 'molar') {
+    const mwN = parseNumber(mw);
+    if (mwN && mwN.error) return { error: 'Molecular weight is required for molar concentrations.' };
+    if (mwN <= 0) return { error: 'Molecular weight must be greater than zero.' };
+    const moles = massG / mwN;
+    volL = moles / desired.value;
+  } else if (desired.type === 'massvol' || desired.type === 'percent-wv' || desired.type === 'percent-ww') {
+    if (desired.value === 0) return { error: 'Desired concentration cannot be zero.' };
+    // desired.value is mg/mL; mass in g; vol(L) = mass(g) / conc(mg/mL)
+    volL = massG / desired.value;
+  } else if (desired.type === 'activity') {
+    if (desired.value === 0) return { error: 'Desired concentration cannot be zero.' };
+    // For activity, we can't compute from mass alone — would need specific activity.
+    return { error: 'Activity-unit reconstitution needs specific activity; use mass/vol instead.' };
+  } else {
+    return { error: 'Unsupported concentration type for reconstitution.' };
+  }
 
-    if (mass.error) { showError(errorEl, mass.error); return; }
-    if (desiredConc.error) { showError(errorEl, desiredConc.error); return; }
-
-    let volL = 0;
-
-    if (desiredConc.type === 'molar') {
-        const mw = parseScientific(getEl('recon_mw').value);
-        if (mw.error || mw <= 0) {
-            showError(errorEl, 'Molecular Weight (MW) is required for molar calculations.');
-            return;
-        }
-        const moles = mass / mw;
-        volL = moles / desiredConc.value;
-    } else { // mass/vol or activity
-        volL = mass / desiredConc.value;
-    }
-
-    if (volL <= 0 || !isFinite(volL)) {
-        showError(errorEl, 'Calculation resulted in an invalid volume. Please check inputs.');
-        return;
-    }
-    showResult(resultEl, `
-        <p class="font-semibold">Add solvent to reconstitute:</p>
-        <p><strong>${formatNumber(volL * 1e3)} mL</strong> (or ${formatNumber(volL * 1e6)} µL or ${formatNumber(volL)} L)</p>
-    `);
+  if (!Number.isFinite(volL) || volL <= 0) {
+    return { error: 'Calculation produced an invalid volume. Check inputs.' };
+  }
+  return { volL };
 }
 
-export function calculateMVC() {
-    const resultEl = getEl('mvc_result');
-    const errorEl = getEl('mvc_error');
-    resultEl.classList.add('hidden');
-    errorEl.textContent = '';
-    const solveFor = getEl('mvc_solve_for').value;
+/* ---------------------------------------------------------------------------
+   4a. Seeding — single suspension (formerly calculateCellSeeding)
+   Inputs are plain cells/mL numbers (expanded from mantissa×exponent
+   by the screen) and volume in mL.
+   --------------------------------------------------------------------------*/
+export function computeSeedingSingle({ stockConc, finalConc, finalVolMl }) {
+  if (!Number.isFinite(stockConc) || stockConc <= 0) return { error: 'Stock concentration must be a positive number.' };
+  if (!Number.isFinite(finalConc) || finalConc < 0)  return { error: 'Final concentration must be a non-negative number.' };
+  if (!Number.isFinite(finalVolMl) || finalVolMl <= 0) return { error: 'Final volume must be a positive number.' };
+  if (stockConc < finalConc) return { error: 'Stock concentration cannot be less than final concentration.' };
 
-    const mass = parseToBase(getEl('mvc_mass').value, getEl('mvc_mass_unit').value, massToBase, 'mass');
-    const vol = parseToBase(getEl('mvc_volume').value, getEl('mvc_vol_unit').value, volumeToBase, 'volume');
-    const conc = parseToBase(getEl('mvc_conc').value, getEl('mvc_conc_unit').value, massPerVolToBase, 'concentration');
+  const stockVolMl = (finalConc * finalVolMl) / stockConc;
+  const mediaVolMl = finalVolMl - stockVolMl;
+  const totalCells = finalConc * finalVolMl;
 
-    let resultHtml = '';
-    try {
-        if (solveFor === 'mass') {
-            if (vol.error) throw new Error(vol.error);
-            if (conc.error) throw new Error(conc.error);
-            const massG = conc * vol;
-            resultHtml = `<p>Resulting Mass: <strong>${formatNumber(massG * 1000)} mg</strong> (or ${formatNumber(massG)} g)</p>`;
-        } else if (solveFor === 'volume') {
-            if (mass.error) throw new Error(mass.error);
-            if (conc.error) throw new Error(conc.error);
-            const volL = mass / conc;
-            resultHtml = `<p>Resulting Volume: <strong>${formatNumber(volL * 1000)} mL</strong> (or ${formatNumber(volL * 1e6)} µL)</p>`;
-        } else if (solveFor === 'concentration') {
-            if (mass.error) throw new Error(mass.error);
-            if (vol.error) throw new Error(vol.error);
-            const concGL = mass / vol;
-            resultHtml = `<p>Resulting Concentration: <strong>${formatNumber(concGL)} g/L</strong> (or ${formatNumber(concGL)} mg/mL)</p>`;
-        }
-        showResult(resultEl, resultHtml);
-    } catch (e) {
-        showError(errorEl, e.message);
-    }
+  return { stockVolMl, mediaVolMl, totalCells, finalVolMl };
 }
 
-export function calculateCellSeeding() {
-    const resultEl = getEl('cs_result');
-    const errorEl = getEl('cs_error');
-    resultEl.classList.add('hidden');
-    errorEl.textContent = '';
-
-    const stockConc = parseScientific(getEl('cs_stock_conc').value);
-    const finalConc = parseScientific(getEl('cs_final_conc').value);
-    const finalVol = parseScientific(getEl('cs_final_vol').value);
-
-    if (stockConc.error) { showError(errorEl, stockConc.error); return; }
-    if (finalConc.error) { showError(errorEl, finalConc.error); return; }
-    if (finalVol.error) { showError(errorEl, finalVol.error); return; }
-
-    if (stockConc <= 0 || finalConc < 0 || finalVol <= 0) {
-        showError(errorEl, 'Concentrations and volumes must be positive numbers.');
-        return;
-    }
-    if (stockConc < finalConc) {
-        showError(errorEl, 'Stock concentration cannot be less than final concentration.');
-        return;
-    }
-
-    // C1V1 = C2V2  => V1 = (C2 * V2) / C1
-    const stockVolNeeded = (finalConc * finalVol) / stockConc; // in mL
-    const mediaVolNeeded = finalVol - stockVolNeeded; // in mL
-
-    showResult(resultEl, `
-        <p class="font-semibold">To prepare ${formatNumber(finalVol)} mL of cell suspension:</p>
-        <ul class="list-disc list-inside mt-2 space-y-1">
-            <li>Take <strong>${formatNumber(stockVolNeeded)} mL</strong> (or ${formatNumber(stockVolNeeded * 1000)} µL) of your cell stock.</li>
-            <li>Add <strong>${formatNumber(mediaVolNeeded)} mL</strong> of fresh media.</li>
-        </ul>
-        <p class="mt-2 text-sm text-slate-600">This will yield a total of ${formatNumber(finalConc * finalVol)} cells.</p>
-    `);
-}
-
-export function calculateSerialDose() {
-    const resultEl = getEl('sd_result');
-    const errorEl = getEl('sd_error');
-    resultEl.classList.add('hidden', 'hidden');
-    errorEl.textContent = '';
-
-    // --- 1. Parse all inputs ---
-    const originalValues = {
-        massVal: getEl('sd_final_mass_val').value,
-        massUnit: getEl('sd_final_mass_unit').value,
-        volVal: getEl('sd_final_vol_val').value,
-        volUnit: getEl('sd_final_vol_unit').value,
-    };
-
-    const stockConcMap = { 'mg/mL': 1, 'µg/mL': 1e-3, 'g/L': 1, 'ng/mL': 1e-6, 'µg/µL': 1 };
-    const cStock = parseToBase(getEl('sd_stock_val').value, getEl('sd_stock_unit').value, stockConcMap, 'concentration');
-    const finalMass_mg = parseToBase(originalValues.massVal, originalValues.massUnit, massToBase, 'mass') * 1000;
-    const finalVol_uL = parseToBase(originalValues.volVal, originalValues.volUnit, { 'mL': 1000, 'µL': 1 }, 'volume');
-    const minPipetteVol_uL = parseScientific(getEl('sd_min_pipette_vol').value);
-    const interVol_uL = parseScientific(getEl('sd_inter_vol').value);
-
-    // --- 2. Validate inputs ---
-    if (cStock.error || cStock <= 0) { showError(errorEl, 'Invalid Stock Concentration.'); return; }
-    if (finalMass_mg.error) { showError(errorEl, finalMass_mg.error); return; }
-    if (finalVol_uL.error) { showError(errorEl, finalVol_uL.error); return; }
-    if (minPipetteVol_uL.error || minPipetteVol_uL <= 0) { showError(errorEl, 'Min. Pipetting Volume must be > 0.'); return; }
-    if (interVol_uL.error || interVol_uL <= minPipetteVol_uL) { showError(errorEl, 'Intermediate Volume must be > Min. Pipetting Volume.'); return; }
-
-    const cTarget = finalMass_mg / (finalVol_uL / 1000); // Target concentration in mg/mL
-
-    if (cStock < cTarget) {
-        showError(errorEl, 'Stock Concentration cannot be less than the required Final Concentration.');
-        return;
-    }
-
-    // --- 3. Strategy 1: Direct Dilution ---
-    const volFromStock_uL = (cTarget / cStock) * finalVol_uL;
-    if (volFromStock_uL >= minPipetteVol_uL) {
-        const diluentVol_uL = finalVol_uL - volFromStock_uL;
-        let resultHtml = `<p class="font-semibold text-green-800">A direct dilution is the most efficient method.</p>
-                          <p class="mt-2">To prepare your dose:</p>
-                          <ul class="list-disc list-inside mt-2 space-y-1">
-                            <li>Take <strong>${formatDoseNumber(volFromStock_uL)} µL</strong> of your original stock (${formatConcentration(cStock)}).</li>`;
-        if (diluentVol_uL > 1e-9) { // Avoid showing if it's effectively zero
-            resultHtml += `<li>Add <strong>${formatDoseNumber(diluentVol_uL)} µL</strong> of diluent.</li>`;
-        }
-        resultHtml += `<li class="text-sm text-slate-600">This gives you a final volume of ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li></ul>`;
-        showResult(resultEl, resultHtml);
-        return;
-    }
-
-    // --- 4. Strategy 2: Serial Dilution ---
-    let protocolHtml = `<p class="font-semibold">A direct dilution is not practical. The following serial dilution is recommended:</p>`;
-    let currentStockConc = cStock;
-    let stepCounter = 1;
-    const maxDilutionFactor = interVol_uL / minPipetteVol_uL;
-
-    while (stepCounter <= 10) { // Safety break
-        // Concentration of the intermediate stock we need to make
-        const cIntermediateNeeded = (cTarget * finalVol_uL) / minPipetteVol_uL;
-
-        if (currentStockConc <= cIntermediateNeeded) {
-            // We can now make the final dilution from the current stock
-            const v1_final_uL = (cTarget * finalVol_uL) / currentStockConc;
-            const diluent_final_uL = finalVol_uL - v1_final_uL;
-
-            protocolHtml += `<div class="mt-4"><p class="font-medium">Step ${stepCounter}: Prepare the Final Dose</p><ul class="list-disc list-inside mt-2 space-y-1">
-                <li>Take <strong>${formatDoseNumber(v1_final_uL)} µL</strong> of the last intermediate stock (${formatConcentration(currentStockConc)}).</li>`;
-            if (diluent_final_uL > 1e-9) {
-                protocolHtml += `<li>Add <strong>${formatDoseNumber(diluent_final_uL)} µL</strong> of diluent.</li>`;
-            }
-            protocolHtml += `<li class="text-sm text-slate-600">This gives you a final volume of ${originalValues.volVal} ${originalValues.volUnit} containing exactly <strong>${originalValues.massVal} ${originalValues.massUnit}</strong> of the drug.</li></ul></div>`;
-            showResult(resultEl, protocolHtml);
-            return;
-        }
-
-        // We need another intermediate dilution step
-        let dilutionFactor = Math.min(maxDilutionFactor, Math.ceil(currentStockConc / cIntermediateNeeded));
-        // Prefer round dilution factors if they are close enough (e.g. 9.8 -> 10)
-        if (Math.abs(dilutionFactor - 10) < 0.5) dilutionFactor = 10;
-        if (Math.abs(dilutionFactor - 100) < 5) dilutionFactor = 100;
-
-        const volToTake = interVol_uL / dilutionFactor;
-        const diluentForStep = interVol_uL - volToTake;
-        const nextStockConc = currentStockConc / dilutionFactor;
-
-        protocolHtml += `<div class="mt-4"><p class="font-medium">Step ${stepCounter}: Prepare Intermediate Stock #${stepCounter} (${formatConcentration(nextStockConc)})</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li>Take <strong>${formatDoseNumber(volToTake)} µL</strong> of your previous stock (${formatConcentration(currentStockConc)}).</li>
-                <li>Add <strong>${formatDoseNumber(diluentForStep)} µL</strong> of diluent (to make ${interVol_uL} µL total).</li>
-            </ul></div>`;
-
-        currentStockConc = nextStockConc;
-        stepCounter++;
-    }
-
-    showError(errorEl, 'Cannot find a practical dilution protocol within 10 steps. Your stock may be too concentrated or your constraints too strict.');
-}
-
-const PLATE_PRESETS = {
-    '6-well':   { surface_area_cm2: 9.6, media_vol_ml: 2 },
-    '12-well':  { surface_area_cm2: 3.8, media_vol_ml: 1 },
-    '24-well':  { surface_area_cm2: 1.9, media_vol_ml: 0.5 },
-    '48-well':  { surface_area_cm2: 0.95, media_vol_ml: 0.25 },
-    '96-well':  { surface_area_cm2: 0.32, media_vol_ml: 0.1 },
-    '384-well': { surface_area_cm2: 0.08, media_vol_ml: 0.025 }
+/* ---------------------------------------------------------------------------
+   4b. Seeding — plate master mix (formerly calculatePlateSeeding)
+   --------------------------------------------------------------------------*/
+export const PLATE_PRESETS = {
+  '6-well':   { surfaceAreaCm2: 9.6,  mediaVolMl: 2 },
+  '12-well':  { surfaceAreaCm2: 3.8,  mediaVolMl: 1 },
+  '24-well':  { surfaceAreaCm2: 1.9,  mediaVolMl: 0.5 },
+  '48-well':  { surfaceAreaCm2: 0.95, mediaVolMl: 0.25 },
+  '96-well':  { surfaceAreaCm2: 0.32, mediaVolMl: 0.1 },
+  '384-well': { surfaceAreaCm2: 0.08, mediaVolMl: 0.025 },
 };
 
-export function calculatePlateSeeding() {
-    const resultEl = getEl('ps_result');
-    const errorEl = getEl('ps_error');
-    resultEl.classList.add('hidden');
-    errorEl.textContent = '';
+export function computeSeedingPlate({ plateType, wellsToSeed, seedingDensity, stockConc, customSurfaceAreaCm2, customMediaVolMl }) {
+  if (!Number.isFinite(wellsToSeed) || wellsToSeed <= 0) return { error: 'Number of wells must be a positive number.' };
+  if (!Number.isFinite(seedingDensity) || seedingDensity <= 0) return { error: 'Seeding density must be a positive number.' };
+  if (!Number.isFinite(stockConc) || stockConc <= 0) return { error: 'Stock concentration must be a positive number.' };
 
-    // 1. Parse all inputs
-    const plateType = getEl('ps_plate_type').value;
-    const wellsToSeed = parseScientific(getEl('ps_wells_to_seed').value);
-    const seedingDensity = parseScientific(getEl('ps_seeding_density').value);
-    const stockConc = parseScientific(getEl('ps_stock_conc').value);
+  let surfaceAreaCm2, mediaVolPerWellMl;
+  if (plateType === 'custom') {
+    if (!Number.isFinite(customSurfaceAreaCm2) || customSurfaceAreaCm2 <= 0) return { error: 'Custom surface area must be a positive number.' };
+    if (!Number.isFinite(customMediaVolMl) || customMediaVolMl <= 0) return { error: 'Custom media volume must be a positive number.' };
+    surfaceAreaCm2 = customSurfaceAreaCm2;
+    mediaVolPerWellMl = customMediaVolMl;
+  } else if (PLATE_PRESETS[plateType]) {
+    surfaceAreaCm2 = PLATE_PRESETS[plateType].surfaceAreaCm2;
+    mediaVolPerWellMl = PLATE_PRESETS[plateType].mediaVolMl;
+  } else {
+    return { error: `Unknown plate type: ${plateType}.` };
+  }
 
-    // 2. Validate inputs
-    if (wellsToSeed.error || wellsToSeed <= 0) { showError(errorEl, 'Please enter a valid number of wells.'); return; }
-    if (seedingDensity.error || seedingDensity <= 0) { showError(errorEl, 'Please enter a valid seeding density.'); return; }
-    if (stockConc.error || stockConc <= 0) { showError(errorEl, 'Please enter a valid stock concentration.'); return; }
+  const numWellsOverhead = Math.ceil(wellsToSeed * 1.1);
+  const totalCellsNeeded = seedingDensity * surfaceAreaCm2 * wellsToSeed;
+  const totalVolMl = mediaVolPerWellMl * wellsToSeed;
+  const finalCellConc = totalCellsNeeded / totalVolMl;
 
-    let surfaceArea, mediaVolPerWell;
-    if (plateType === 'custom') {
-        surfaceArea = parseScientific(getEl('ps_custom_surface_area').value);
-        mediaVolPerWell = parseScientific(getEl('ps_custom_media_vol').value) / 1000; // convert µL to mL
-        if (surfaceArea.error || surfaceArea <= 0) { showError(errorEl, 'Please enter a valid custom surface area.'); return; }
-        if (mediaVolPerWell.error || mediaVolPerWell <= 0) { showError(errorEl, 'Please enter a valid custom media volume.'); return; }
-    } else {
-        surfaceArea = PLATE_PRESETS[plateType].surface_area_cm2;
-        mediaVolPerWell = PLATE_PRESETS[plateType].media_vol_ml;
+  if (stockConc < finalCellConc) {
+    return { error: `Stock concentration (${stockConc.toPrecision(3)} cells/mL) is too low for the required final concentration (${finalCellConc.toPrecision(3)} cells/mL).` };
+  }
+
+  const masterMixTotalVolMl = mediaVolPerWellMl * numWellsOverhead;
+  const masterMixTotalCells = finalCellConc * masterMixTotalVolMl;
+  const stockVolForMmMl = masterMixTotalCells / stockConc;
+  const mediaVolForMmMl = masterMixTotalVolMl - stockVolForMmMl;
+
+  return {
+    totalCellsNeeded, finalCellConc,
+    numWellsOverhead,
+    masterMixTotalVolMl,
+    stockVolForMmMl, mediaVolForMmMl,
+    mediaVolPerWellMl, wellsToSeed,
+    surfaceAreaCm2, seedingDensity, plateType,
+  };
+}
+
+/* ---------------------------------------------------------------------------
+   5. Serial Dosing — with the v1 bug fixed (no more {error}×1000→NaN).
+   --------------------------------------------------------------------------*/
+export function computeSerialDose({
+  stockVal, stockUnit,
+  finalMassVal, finalMassUnit,
+  finalVolVal, finalVolUnit,
+  minPipetteUl, interVolUl,
+}) {
+  // Stock → base mg/mL
+  const stockConcMap = { 'mg/mL': 1, 'µg/mL': 1e-3, 'g/L': 1, 'ng/mL': 1e-6, 'µg/µL': 1 };
+  const cStock = parseToBase(stockVal, stockUnit, stockConcMap, 'stock concentration');
+  if (cStock.error) return cStock;
+  if (cStock <= 0) return { error: 'Stock concentration must be greater than zero.' };
+
+  // Final mass — parse to grams FIRST, validate, THEN convert to mg
+  const finalMassG = parseToBase(finalMassVal, finalMassUnit, massToBase, 'final mass');
+  if (finalMassG.error) return finalMassG;
+  const finalMassMg = finalMassG * 1000;
+
+  // Final volume — parse directly to µL
+  const finalVolUl = parseToBase(finalVolVal, finalVolUnit, { 'mL': 1000, 'µL': 1 }, 'final volume');
+  if (finalVolUl.error) return finalVolUl;
+
+  const minPip = parseNumber(minPipetteUl);
+  if (minPip && minPip.error) return { error: 'Minimum pipetting volume must be a number.' };
+  if (minPip <= 0) return { error: 'Minimum pipetting volume must be greater than zero.' };
+
+  const interVol = parseNumber(interVolUl);
+  if (interVol && interVol.error) return { error: 'Intermediate volume must be a number.' };
+  if (interVol <= minPip) return { error: 'Intermediate volume must be larger than the minimum pipetting volume.' };
+
+  const cTarget = finalMassMg / (finalVolUl / 1000); // mg/mL
+  if (cStock < cTarget) return { error: 'Stock concentration cannot be less than the required final concentration.' };
+
+  // Strategy 1: direct dilution
+  const volFromStockUl = (cTarget / cStock) * finalVolUl;
+  if (volFromStockUl >= minPip) {
+    return {
+      strategy: 'direct',
+      cStockMgMl: cStock,
+      cTargetMgMl: cTarget,
+      stockVolUl: volFromStockUl,
+      diluentVolUl: finalVolUl - volFromStockUl,
+      finalVolUl, finalMassMg,
+    };
+  }
+
+  // Strategy 2: serial dilution
+  const steps = [];
+  let currentStock = cStock;
+  const maxDilutionFactor = interVol / minPip;
+  let stepIx = 1;
+
+  while (stepIx <= 10) {
+    const cIntermediateNeeded = (cTarget * finalVolUl) / minPip;
+    if (currentStock <= cIntermediateNeeded) {
+      const v1Ul = (cTarget * finalVolUl) / currentStock;
+      const diluentUl = finalVolUl - v1Ul;
+      steps.push({
+        kind: 'final',
+        stepNumber: stepIx,
+        fromStockMgMl: currentStock,
+        takeStockUl: v1Ul,
+        diluentUl,
+        producesMgMl: cTarget,
+      });
+      return { strategy: 'serial', cStockMgMl: cStock, cTargetMgMl: cTarget, finalVolUl, finalMassMg, steps };
     }
 
-    // 3. Calculate master mix
-    // Add 10% extra volume to account for pipetting errors, a common lab practice
-    const numWellsWithOverhead = Math.ceil(wellsToSeed * 1.1);
+    let factor = Math.min(maxDilutionFactor, Math.ceil(currentStock / cIntermediateNeeded));
+    if (Math.abs(factor - 10) < 0.5) factor = 10;
+    if (Math.abs(factor - 100) < 5)  factor = 100;
 
-    const totalCellsNeeded = seedingDensity * surfaceArea * wellsToSeed;
-    const totalVolumeNeeded = mediaVolPerWell * wellsToSeed;
-
-    const finalCellConc = totalCellsNeeded / totalVolumeNeeded;
-
-    if (stockConc < finalCellConc) {
-        showError(errorEl, `Stock concentration (${formatNumber(stockConc)} cells/mL) is too low for the desired final concentration (${formatNumber(finalCellConc)} cells/mL).`);
-        return;
-    }
-
-    // Calculate for the overhead volume
-    const masterMixTotalVol = mediaVolPerWell * numWellsWithOverhead;
-    const masterMixTotalCells = finalCellConc * masterMixTotalVol;
-
-    const stockVolForMasterMix = masterMixTotalCells / stockConc;
-    const mediaVolForMasterMix = masterMixTotalVol - stockVolForMasterMix;
-
-    // 4. Display results
-    showResult(resultEl, `
-        <p class="font-semibold">To seed ${wellsToSeed} well(s) at ${formatNumber(seedingDensity)} cells/cm²:</p>
-        <div class="mt-4">
-            <p class="font-medium">Step 1: Prepare Master Mix</p>
-            <p class="text-sm text-slate-600">(Includes a 10% overhead for ${numWellsWithOverhead - wellsToSeed} extra well(s))</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li>Take <strong>${formatNumber(stockVolForMasterMix * 1000)} µL</strong> (or ${formatNumber(stockVolForMasterMix)} mL) of your cell stock.</li>
-                <li>Add <strong>${formatNumber(mediaVolForMasterMix)} mL</strong> of fresh media.</li>
-                <li class="text-sm text-slate-600">This creates a total of <strong>${formatNumber(masterMixTotalVol)} mL</strong> of cell suspension.</li>
-            </ul>
-        </div>
-        <div class="mt-4">
-            <p class="font-medium">Step 2: Plate the Cells</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li>Gently mix the suspension and add <strong>${formatNumber(mediaVolPerWell * 1000)} µL</strong> to each of the <strong>${wellsToSeed}</strong> wells.</li>
-            </ul>
-        </div>
-        <div class="mt-3 text-xs text-slate-500">
-            <p>Total cells required: ${formatNumber(totalCellsNeeded)}</p>
-            <p>Final concentration in wells: ${formatNumber(finalCellConc)} cells/mL</p>
-        </div>
-    `);
+    const takeUl    = interVol / factor;
+    const diluentUl = interVol - takeUl;
+    const nextConc  = currentStock / factor;
+    steps.push({
+      kind: 'intermediate',
+      stepNumber: stepIx,
+      fromStockMgMl: currentStock,
+      takeStockUl: takeUl,
+      diluentUl,
+      intermediateVolUl: interVol,
+      producesMgMl: nextConc,
+    });
+    currentStock = nextConc;
+    stepIx++;
+  }
+  return { error: 'Could not find a practical dilution protocol within 10 steps. Try raising the intermediate volume or lowering the minimum pipetting volume.' };
 }

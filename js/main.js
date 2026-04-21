@@ -1,52 +1,76 @@
+/* ==========================================================================
+   main.js — entry point. Registers screens, wires the tab bar, boots home.
+   ========================================================================== */
+
 import { getEl, querySelAll } from './utils.js';
-import { switchTab, setupDynamicFields, setupPlateSeedingUI, setupTheme } from './ui.js';
-import {
-    calculateDilution,
-    calculateMolarityCalc,
-    calculateReconstitution,
-    calculateMVC,
-    calculateCellSeeding,
-    calculateSerialDose,
-    calculatePlateSeeding
-} from './calculators.js';
+import { getSettings, setSetting } from './storage.js';
+import { registerScreen, registerTab, go } from './router.js';
 
+import { renderHome } from './screens/home.js';
+import { renderRecipes } from './screens/recipes.js';
+import { renderHistory } from './screens/history.js';
+import { renderSettings } from './screens/settings.js';
+
+import { renderDilution } from './screens/dilution.js';
+import { renderConcentration } from './screens/concentration.js';
+import { renderReconstitution } from './screens/reconstitution.js';
+import { renderSeeding } from './screens/seeding.js';
+import { renderSerial } from './screens/serial.js';
+import { renderBuilder } from './screens/builder.js';
+
+/* ---------- Theme ---------- */
+function applyTheme(theme) {
+  const wantsDark = theme === 'dark' ||
+    (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', wantsDark);
+  getEl('icon-sun').style.display  = wantsDark ? 'none'  : 'block';
+  getEl('icon-moon').style.display = wantsDark ? 'block' : 'none';
+}
+
+function initTheme() {
+  const { theme } = getSettings();
+  applyTheme(theme);
+
+  getEl('theme-toggle').addEventListener('click', () => {
+    const cur = getSettings().theme;
+    // Cycle: auto → light → dark → auto
+    const next = cur === 'auto' ? 'light' : cur === 'light' ? 'dark' : 'auto';
+    setSetting('theme', next);
+    applyTheme(next);
+  });
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (getSettings().theme === 'auto') applyTheme('auto');
+  });
+}
+
+/* ---------- Screens ---------- */
+function registerAllScreens() {
+  registerScreen('home',           { el: getEl('screen-home'),           render: () => renderHome(getEl('screen-home')),                       onEnter: () => renderHome(getEl('screen-home')) });
+  registerScreen('recipes',        { el: getEl('screen-recipes'),        render: () => renderRecipes(getEl('screen-recipes')),                 onEnter: () => renderRecipes(getEl('screen-recipes')) });
+  registerScreen('history',        { el: getEl('screen-history'),        render: () => renderHistory(getEl('screen-history')),                 onEnter: () => renderHistory(getEl('screen-history')) });
+  registerScreen('settings',       { el: getEl('screen-settings'),       render: () => renderSettings(getEl('screen-settings')) });
+
+  registerScreen('dilution',       { el: getEl('screen-dilution'),       render: () => renderDilution(getEl('screen-dilution')) });
+  registerScreen('concentration',  { el: getEl('screen-concentration'),  render: () => renderConcentration(getEl('screen-concentration')) });
+  registerScreen('reconstitution', { el: getEl('screen-reconstitution'), render: () => renderReconstitution(getEl('screen-reconstitution')) });
+  registerScreen('seeding',        { el: getEl('screen-seeding'),        render: () => renderSeeding(getEl('screen-seeding')) });
+  registerScreen('serial',         { el: getEl('screen-serial'),         render: () => renderSerial(getEl('screen-serial')) });
+  registerScreen('builder',        { el: getEl('screen-builder'),        render: (ctx) => renderBuilder(getEl('screen-builder'), ctx),           onEnter: () => renderBuilder(getEl('screen-builder')) });
+}
+
+/* ---------- Tab bar ---------- */
+function wireTabs() {
+  querySelAll('.tab').forEach(btn => {
+    registerTab(btn.dataset.target, btn);
+    btn.addEventListener('click', () => go(btn.dataset.target));
+  });
+}
+
+/* ---------- Boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-    const tabs = querySelAll('.tab');
-
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => switchTab(tab.dataset.target));
-    });
-
-    // --- Connect Dynamic Field Selectors ---
-    setupDynamicFields(getEl('mvc_solve_for'), {
-        mass: 'mvc_input_mass',
-        volume: 'mvc_input_volume',
-        concentration: 'mvc_input_conc'
-    });
-
-    setupDynamicFields(getEl('mol_calc_solve_for'), {
-        mass: 'mol_input_mass',
-        volume: 'mol_input_volume',
-        molarity: 'mol_input_molarity'
-    });
-
-    // --- Connect ALL Calculator Buttons ---
-    getEl('dilution-calculator').querySelector('button').addEventListener('click', calculateDilution);
-    getEl('molarity-calculator').querySelector('button').addEventListener('click', calculateMolarityCalc);
-    getEl('reconstitution-calculator').querySelector('button').addEventListener('click', calculateReconstitution);
-    getEl('mass-vol-conc-calculator').querySelector('button').addEventListener('click', calculateMVC);
-    getEl('cell-seeding-calculator').querySelector('button').addEventListener('click', calculateCellSeeding);
-
-    // This connects your new button
-    getEl('calculate_sd_btn').addEventListener('click', calculateSerialDose);
-    getEl('calculate_ps_btn').addEventListener('click', calculatePlateSeeding);
-
-    // Setup UI handlers
-    setupPlateSeedingUI();
-    setupTheme();
-
-    // Activate the first tab on page load
-    if (tabs.length > 0) {
-        switchTab(tabs[0].dataset.target);
-    }
+  initTheme();
+  registerAllScreens();
+  wireTabs();
+  go('home');
 });
