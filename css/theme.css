@@ -118,13 +118,10 @@ input[type="number"] { -moz-appearance: textfield; }
 .shell {
   max-width: var(--shell-max);
   margin: 0 auto;
-  min-height: 100vh;
+  height: 100vh;                    /* fallback */
+  height: 100dvh;                   /* dynamic viewport — excludes iOS home indicator */
   position: relative;
   display: flex; flex-direction: column;
-}
-
-@media (min-width: 900px) {
-  .shell { padding-top: 24px; }
 }
 
 .status-bar {
@@ -140,16 +137,17 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 .screens {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;                   /* critical so flex child can shrink instead of overflowing */
   position: relative;
-  min-height: calc(100vh - var(--tabbar-h) - 40px);
+  overflow: hidden;                /* individual .screen handles its own scroll */
 }
 
 .screen {
   position: absolute; inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 22px calc(var(--tabbar-h) + 24px);
+  padding: 20px 22px 24px;
   opacity: 0; pointer-events: none;
   transform: translateX(24px);
   transition: transform 340ms var(--ease-smooth), opacity 260ms;
@@ -165,8 +163,7 @@ input[type="number"] { -moz-appearance: textfield; }
    Bottom tab bar
    ========================================================================== */
 .tab-bar {
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;                   /* stays at its natural height at the bottom of the flex shell */
   padding:
     10px
     calc(env(safe-area-inset-right, 0px) + 24px)
@@ -178,7 +175,6 @@ input[type="number"] { -moz-appearance: textfield; }
   border-top: 1px solid rgba(42, 31, 20, 0.06);
   display: flex; justify-content: space-around; align-items: center;
   z-index: 40;
-  min-height: var(--tabbar-h);
 }
 :root.dark .tab-bar {
   background: rgba(31, 24, 18, 0.92);
