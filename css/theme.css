@@ -89,20 +89,28 @@
 
 html, body {
   margin: 0; padding: 0;
-  min-height: 100vh;
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   color: var(--ink);
-  background: var(--cream);
-  overflow-x: hidden;              /* no accidental sideways scroll */
 }
 
+/* Lock the document to the viewport so only .screen scrolls internally —
+   prevents the top header from scrolling off-screen on iOS PWA. */
+html {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  width: 100%; height: 100%;
+}
 body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  width: 100%; height: 100%;
   background:
     radial-gradient(600px 400px at 80% 10%, rgba(229,106,79,0.10), transparent 60%),
     radial-gradient(500px 400px at 15% 85%, rgba(143,166,126,0.08), transparent 60%),
     var(--cream);
-  background-attachment: fixed;
 }
 
 /* Strip number-input spinner arrows */
@@ -118,8 +126,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .shell {
   max-width: var(--shell-max);
   margin: 0 auto;
-  height: 100vh;                    /* fallback */
-  height: 100dvh;                   /* dynamic viewport — excludes iOS home indicator */
+  height: 100%;                     /* body is already locked to the viewport */
   position: relative;
   display: flex; flex-direction: column;
 }

@@ -67,10 +67,62 @@ function wireTabs() {
   });
 }
 
+/* ---------- Horizontal swipe between top-level tabs ----------
+   Swipe left → next tab; swipe right → previous tab. Only active when the
+   currently-visible screen is one of the 4 top-level tabs (not a calculator
+   screen — swipe there would collide with horizontally-scrolling content). */
+const TAB_ORDER = ['home', 'recipes', 'history', 'settings'];
+
+function wireSwipes() {
+  const el = document.getElementById('screens');
+  let startX = 0, startY = 0, startT = 0, tracking = false;
+
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    startX = t.clientX;
+    startY = t.clientY;
+    startT = Date.now();
+    tracking = true;
+  }, { passive: true });
+
+  el.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const t = (e.changedTouches && e.changedTouches[0]) || null;
+    if (!t) return;
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    const dt = Date.now() - startT;
+
+    // Must be a decisive horizontal swipe — bigger than 60px, mostly horizontal,
+    // under 600ms.
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7 || dt > 600) return;
+
+    // Only swipe between top-level tabs — otherwise calculator screens with
+    // horizontal carousels (preset chips) would misfire.
+    const cur = currentTopTabId();
+    if (cur === null) return;
+
+    const nextIx = dx < 0 ? cur + 1 : cur - 1;
+    if (nextIx < 0 || nextIx >= TAB_ORDER.length) return;
+    go(TAB_ORDER[nextIx]);
+  }, { passive: true });
+}
+
+function currentTopTabId() {
+  const active = document.querySelector('.screen.active');
+  if (!active) return null;
+  const id = active.dataset.screen;
+  const ix = TAB_ORDER.indexOf(id);
+  return ix >= 0 ? ix : null;
+}
+
 /* ---------- Boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   registerAllScreens();
   wireTabs();
+  wireSwipes();
   go('home');
 });
