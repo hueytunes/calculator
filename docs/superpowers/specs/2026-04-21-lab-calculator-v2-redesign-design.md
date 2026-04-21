@@ -73,7 +73,7 @@ The app is a **single-page** (`index.html`) with a **fixed shell** (status bar a
 | 1 | **Dilution** | existing `calculateDilution` | Redesigned UI only |
 | 2 | **Concentration** | merged `calculateMolarityCalc` + `calculateMVC` | "Solve for" selector handles mass, volume, or concentration. Unit dropdown spans both mass/vol and molar. MW input becomes required only when a molar unit is chosen. |
 | 3 | **Reconstitution** | existing `calculateReconstitution` | Redesigned UI only |
-| 4 | **Seeding** | merged `calculateCellSeeding` + `calculatePlateSeeding` | Mode toggle at top: "Single suspension" (cell seeding) / "Plate master mix" (plate seeding). UI below the toggle swaps accordingly. |
+| 4 | **Seeding** | merged `calculateCellSeeding` + `calculatePlateSeeding` | Mode toggle at top: "Single suspension" (cell seeding) / "Plate master mix" (plate seeding). UI below the toggle swaps accordingly. Cell-concentration and seeding-density inputs use a **mantissa × 10ⁿ** control (see §5.5) so you can type "1.1" + pick "×10⁶" to mean 1.1 × 10⁶ cells/mL, matching how counter readouts are displayed. |
 | 5 | **Serial Dosing** | existing `calculateSerialDose` (with bug fix — see §9) | Redesigned UI; error handling fixed |
 | 6 | **Recipe Builder** | brand new | See §6 |
 
@@ -126,7 +126,38 @@ Dark mode inverts with a warm dark variant — deep cream `#1f1812` bg, text sta
 - Bouncy easing for UI (`cubic-bezier(0.34, 1.56, 0.64, 1)`); smooth easing for screen transitions (`cubic-bezier(0.22, 1, 0.36, 1)`)
 - Tile icons: 44×44 rounded square with soft-tone background + colored glyph/emoji
 
-### 5.4 Desktop behavior (option "C")
+### 5.4 Number inputs (consistent across the app)
+
+All numeric inputs use `<input type="number" inputmode="decimal" step="any">`:
+
+- Mobile shows the numeric keypad automatically
+- Desktop-browser spinner arrows are hidden via CSS
+- Accepts plain decimals (`1.25`, `0.02`)
+- Accepts native scientific notation (`1e6`, `2.5e-4`) — the browser's parseFloat handles this
+- **Does not** accept fuzzy suffixes (`25k`, `2.5 million`, `3x10^5`). These were error-prone in v1 and are removed.
+
+The existing `parseScientific` function is simplified to a thin `parseFloat(value)` wrapper with validation. The regex-based suffix replacements are deleted. All placeholders are updated to drop suffix examples (e.g., `e.g. 10 or 1e6` stays; `e.g. 25k or 2.5 million` is removed).
+
+### 5.5 Cell-count input component
+
+A reusable compound control for cell-concentration and seeding-density fields:
+
+```
+  Stock cell concentration
+  ┌──────────────┬─────────┐
+  │ 1.1          │ × 10⁶ ▼ │  cells/mL
+  └──────────────┴─────────┘
+```
+
+- Left: plain number input for the **mantissa** (e.g., `1.1`)
+- Right: dropdown for the **exponent**, options: `× 10²`, `× 10³`, `× 10⁴`, `× 10⁵`, `× 10⁶`, `× 10⁷`, `× 10⁸` (default `× 10⁶` for stock concentrations; `× 10³` for cm² densities)
+- Unit label (`cells/mL` or `cells/cm²`) is static next to the control
+- Parser reads the two values and returns `mantissa × 10^exponent`
+- Used in: **Seeding** (stock conc, target conc, plate density)
+
+This matches the display on standard cell counters (Countess, Nexcelom, hemocytometer readout) so there's no mental math at the bench.
+
+### 5.6 Desktop behavior (option "C")
 
 - Content is max-width **640px** and centered
 - Bottom tab bar stays at the bottom; structure is identical to mobile
@@ -346,7 +377,7 @@ calculator-main/
 - **Emoji icons vs SVG** — we're currently leaning on emoji for calculator tile icons (💧, ⚖️, 🧴, etc.). They look warm and render consistently, but emoji style varies by OS. Acceptable for v2; can upgrade to SVG later if we want pixel-perfect consistency.
 - **`localStorage` quota** — 5MB is plenty for recipes + history. Not a concern.
 - **PWA cache invalidation** — since we're not adding a service worker, users always see the latest HTML on page load. No versioning needed.
-- **Keyboard on mobile** — input types are `type="text"` (not `type="number"`) so scientific notation (`1e6`) and 'k'/'million' suffixes work; the existing parseScientific handles this. Minor UX cost: no numeric keypad auto-display. Acceptable trade for input flexibility.
+- **Keyboard on mobile** — resolved: all inputs are `type="number" inputmode="decimal"`. Numeric keypad auto-displays on mobile; scientific notation via `e` still works natively; custom `k/million/x10^` parsing is removed (see §5.4). Cell-specific inputs use the mantissa × exponent dropdown (§5.5).
 
 ## 12. Success criteria
 
@@ -357,3 +388,6 @@ calculator-main/
 - Saved recipes and history survive page refresh
 - App installs as a PWA on iOS Safari and looks correct on a phone
 - Desktop (MacBook Chrome) shows the app centered with comfortable padding; no broken layout
+- Numeric keypad auto-displays on mobile for all input fields (via `type="number" inputmode="decimal"`)
+- Seeding calculator's cell-concentration input accepts `1.1` + `×10⁶` and computes the same result as a v1 input of `1.1e6` or `1100000`
+- Invalid legacy inputs like `25k` or `2.5 million` are rejected (with a clear "enter a number" message) — the removal of fuzzy parsing is verified
