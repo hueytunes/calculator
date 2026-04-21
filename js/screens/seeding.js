@@ -88,71 +88,102 @@ function renderSingle(host) {
 function renderPlate(host) {
   host.appendChild(createEl('p', {
     class: 'hint',
-    text: 'Calculate a master mix for seeding multiple wells at a desired density. Includes 10% overhead.',
+    text: 'Master mix for seeding multiple wells at a target cell concentration. Includes 10% overhead.',
     style: { marginBottom: '16px' },
   }));
 
+  // Plate-type is a convenience: picking a plate auto-fills the volume-per-well.
+  // User can still edit volume-per-well freely.
+  const plateDefaults = {
+    '6-well':   { volMl: 2 },
+    '12-well':  { volMl: 1 },
+    '24-well':  { volMl: 0.5 },
+    '48-well':  { volMl: 0.25 },
+    '96-well':  { volMl: 0.1 },
+    '384-well': { volMl: 0.025 },
+    'custom':   { volMl: null },
+  };
   const plateOpts = [
-    { value: '6-well', label: '6-well (9.6 cm²)' },
-    { value: '12-well', label: '12-well (3.8 cm²)' },
-    { value: '24-well', label: '24-well (1.9 cm²)' },
-    { value: '48-well', label: '48-well (0.95 cm²)' },
-    { value: '96-well', label: '96-well (0.32 cm²)' },
-    { value: '384-well', label: '384-well (0.08 cm²)' },
-    { value: 'custom', label: 'Custom…' },
+    { value: '6-well',   label: '6-well (2 mL / well)' },
+    { value: '12-well',  label: '12-well (1 mL / well)' },
+    { value: '24-well',  label: '24-well (0.5 mL / well)' },
+    { value: '48-well',  label: '48-well (0.25 mL / well)' },
+    { value: '96-well',  label: '96-well (0.1 mL / well)' },
+    { value: '384-well', label: '384-well (0.025 mL / well)' },
+    { value: 'custom',   label: 'Custom…' },
   ];
-  const plateSel = selectGroup({ label: 'Plate type', options: plateOpts, value: '96-well' });
-  const wells    = inputGroup({ label: 'Wells to seed', placeholder: 'e.g. 12', units: null });
-  const density  = cellCountInput({ label: 'Seeding density', value: 5, exponent: 3, unitLabel: 'cells/cm²' });
-  const stock    = cellCountInput({ label: 'Stock cell concentration', value: 1.5, exponent: 6 });
+  const plateSel = selectGroup({ label: 'Plate type', options: plateOpts, value: '6-well' });
+  const wells    = inputGroup({ label: 'Wells to seed', placeholder: 'e.g. 6', units: null });
+
+  const volPerWell = inputGroup({
+    label: 'Volume per well',
+    value: plateDefaults['6-well'].volMl,
+    units: ['mL', 'µL'],
+    defaultUnit: 'mL',
+  });
+
+  // Auto-fill volume per well when plate type changes (unless "custom")
+  plateSel.select.addEventListener('change', () => {
+    const p = plateDefaults[plateSel.select.value];
+    if (p && p.volMl != null) {
+      volPerWell.input.value = p.volMl;
+      volPerWell.select.value = 'mL';
+    }
+  });
+
+  const finalConc = cellCountInput({ label: 'Target cell concentration', value: 1, exponent: 6 });
+  const stock     = cellCountInput({ label: 'Stock cell concentration',  value: 1, exponent: 7 });
 
   host.appendChild(plateSel.wrap);
   host.appendChild(wells.wrap);
-  host.appendChild(density.wrap);
+  host.appendChild(volPerWell.wrap);
+  host.appendChild(finalConc.wrap);
   host.appendChild(stock.wrap);
-
-  const customArea = inputGroup({ label: 'Custom surface area (cm²)', placeholder: 'e.g. 0.32', units: null });
-  const customMed  = inputGroup({ label: 'Custom media vol per well (µL)', placeholder: 'e.g. 100', units: null });
-  customArea.wrap.classList.add('hidden');
-  customMed.wrap.classList.add('hidden');
-  host.appendChild(customArea.wrap);
-  host.appendChild(customMed.wrap);
-
-  plateSel.select.addEventListener('change', () => {
-    const isCustom = plateSel.select.value === 'custom';
-    customArea.wrap.classList.toggle('hidden', !isCustom);
-    customMed.wrap.classList.toggle('hidden', !isCustom);
-  });
 
   const err = errorEl();
   const res = resultEl();
 
   host.appendChild(ctaButton({ text: 'Calculate', onClick: () => {
     hideError(err); hideResult(res);
+    const volPerWellMl = volPerWell.select.value === 'µL'
+      ? parseFloat(volPerWell.input.value) / 1000
+      : parseFloat(volPerWell.input.value);
     const r = computeSeedingPlate({
-      plateType: plateSel.select.value,
       wellsToSeed: parseFloat(wells.input.value),
-      seedingDensity: density.readValue(),
+      volPerWellMl,
+      finalCellConc: finalConc.readValue(),
       stockConc: stock.readValue(),
-      customSurfaceAreaCm2: parseFloat(customArea.input.value),
-      customMediaVolMl: parseFloat(customMed.input.value) / 1000,
     });
     if (r.error) { showError(err, r.error); return; }
 
+    const stockDisplayUl = r.stockVolForMmMl * 1000;
+    const mediaDisplay = r.mediaVolForMmMl >= 1
+      ? `${formatNumber(r.mediaVolForMmMl)} mL`
+      : `${formatNumber(r.mediaVolForMmMl * 1000)} µL`;
+    const perWellDisplay = r.volPerWellMl >= 1
+      ? `${formatNumber(r.volPerWellMl)} mL`
+      : `${formatNumber(r.volPerWellMl * 1000)} µL`;
+
     showResult(res, `
       <div class="result-label">Master mix</div>
-      <div class="result-big">${formatNumber(r.stockVolForMmMl * 1000)}<span class="u">µL</span></div>
+      <div class="result-big">${formatNumber(stockDisplayUl)}<span class="u">µL</span></div>
       <div class="result-sub">
-        of stock + <strong>${formatNumber(r.mediaVolForMmMl)} mL</strong> media
+        of stock + <strong>${mediaDisplay}</strong> media
         = ${formatNumber(r.masterMixTotalVolMl)} mL total (${r.numWellsOverhead} wells-worth, 10% overhead).<br/>
-        Gently mix, then pipette <strong>${formatNumber(r.mediaVolPerWellMl * 1000)} µL</strong> into each of the ${r.wellsToSeed} wells.<br/>
-        <span style="opacity:0.75;font-size:12px">Total cells needed: ${formatNumber(r.totalCellsNeeded)} · Final: ${formatNumber(r.finalCellConc)} cells/mL</span>
+        Gently mix, then pipette <strong>${perWellDisplay}</strong> into each of the ${r.wellsToSeed} wells.<br/>
+        <span style="opacity:0.75;font-size:12px">Cells per well: ${formatNumber(r.cellsPerWell)} · Total cells needed: ${formatNumber(r.totalCellsNeeded)}</span>
       </div>
     `);
     addHistory({
       tool: 'seeding-plate', toolLabel: 'Seeding · plate',
-      inputs: { plateType: plateSel.select.value, wells: parseFloat(wells.input.value), density: density.readValue(), stock: stock.readValue() },
-      summary: `${plateSel.select.value} · ${wells.input.value} wells · ${formatNumber(density.readValue())} cells/cm²`,
+      inputs: {
+        plateType: plateSel.select.value,
+        wells: parseFloat(wells.input.value),
+        volPerWellMl,
+        finalCellConc: finalConc.readValue(),
+        stockConc: stock.readValue(),
+      },
+      summary: `${plateSel.select.value} · ${wells.input.value} wells · ${formatNumber(finalConc.readValue())} cells/mL`,
     });
   }}));
   host.appendChild(err);

@@ -202,45 +202,31 @@ export const PLATE_PRESETS = {
   '384-well': { surfaceAreaCm2: 0.08, mediaVolMl: 0.025 },
 };
 
-export function computeSeedingPlate({ plateType, wellsToSeed, seedingDensity, stockConc, customSurfaceAreaCm2, customMediaVolMl }) {
+/* Plate master mix, parametrized by volume-per-well and target cells/mL
+   (the way most people think about cell seeding day-to-day). */
+export function computeSeedingPlate({ wellsToSeed, volPerWellMl, finalCellConc, stockConc }) {
   if (!Number.isFinite(wellsToSeed) || wellsToSeed <= 0) return { error: 'Number of wells must be a positive number.' };
-  if (!Number.isFinite(seedingDensity) || seedingDensity <= 0) return { error: 'Seeding density must be a positive number.' };
+  if (!Number.isFinite(volPerWellMl) || volPerWellMl <= 0) return { error: 'Volume per well must be a positive number.' };
+  if (!Number.isFinite(finalCellConc) || finalCellConc <= 0) return { error: 'Target cell concentration must be a positive number.' };
   if (!Number.isFinite(stockConc) || stockConc <= 0) return { error: 'Stock concentration must be a positive number.' };
-
-  let surfaceAreaCm2, mediaVolPerWellMl;
-  if (plateType === 'custom') {
-    if (!Number.isFinite(customSurfaceAreaCm2) || customSurfaceAreaCm2 <= 0) return { error: 'Custom surface area must be a positive number.' };
-    if (!Number.isFinite(customMediaVolMl) || customMediaVolMl <= 0) return { error: 'Custom media volume must be a positive number.' };
-    surfaceAreaCm2 = customSurfaceAreaCm2;
-    mediaVolPerWellMl = customMediaVolMl;
-  } else if (PLATE_PRESETS[plateType]) {
-    surfaceAreaCm2 = PLATE_PRESETS[plateType].surfaceAreaCm2;
-    mediaVolPerWellMl = PLATE_PRESETS[plateType].mediaVolMl;
-  } else {
-    return { error: `Unknown plate type: ${plateType}.` };
+  if (stockConc < finalCellConc) {
+    return { error: `Stock (${stockConc.toPrecision(3)} cells/mL) is below target (${finalCellConc.toPrecision(3)} cells/mL).` };
   }
 
   const numWellsOverhead = Math.ceil(wellsToSeed * 1.1);
-  const totalCellsNeeded = seedingDensity * surfaceAreaCm2 * wellsToSeed;
-  const totalVolMl = mediaVolPerWellMl * wellsToSeed;
-  const finalCellConc = totalCellsNeeded / totalVolMl;
-
-  if (stockConc < finalCellConc) {
-    return { error: `Stock concentration (${stockConc.toPrecision(3)} cells/mL) is too low for the required final concentration (${finalCellConc.toPrecision(3)} cells/mL).` };
-  }
-
-  const masterMixTotalVolMl = mediaVolPerWellMl * numWellsOverhead;
-  const masterMixTotalCells = finalCellConc * masterMixTotalVolMl;
-  const stockVolForMmMl = masterMixTotalCells / stockConc;
-  const mediaVolForMmMl = masterMixTotalVolMl - stockVolForMmMl;
+  const totalVolMl            = volPerWellMl * wellsToSeed;
+  const totalCellsNeeded      = finalCellConc * totalVolMl;
+  const cellsPerWell          = finalCellConc * volPerWellMl;
+  const masterMixTotalVolMl   = volPerWellMl * numWellsOverhead;
+  const masterMixTotalCells   = finalCellConc * masterMixTotalVolMl;
+  const stockVolForMmMl       = masterMixTotalCells / stockConc;
+  const mediaVolForMmMl       = masterMixTotalVolMl - stockVolForMmMl;
 
   return {
-    totalCellsNeeded, finalCellConc,
-    numWellsOverhead,
-    masterMixTotalVolMl,
+    totalCellsNeeded, cellsPerWell, finalCellConc,
+    numWellsOverhead, wellsToSeed,
+    masterMixTotalVolMl, volPerWellMl,
     stockVolForMmMl, mediaVolForMmMl,
-    mediaVolPerWellMl, wellsToSeed,
-    surfaceAreaCm2, seedingDensity, plateType,
   };
 }
 

@@ -53,10 +53,9 @@ export function renderBuilder(host, ctx) {
     avatar: currentRecipe.icon || '✨',
   }));
 
-  // Preset chip row (only for a fresh blank recipe)
-  if (!ctx || (!ctx.recipeId && !ctx.presetId && currentRecipe.ingredients.length <= 1 && !currentRecipe.ingredients[0].name)) {
-    host.appendChild(renderPresetChips());
-  }
+  // Preset chip row — always visible so you can swap recipes without leaving.
+  // The currently-loaded preset (if any) is highlighted.
+  host.appendChild(renderPresetChips(currentRecipe.presetId));
 
   // Recipe meta: name + final volume + diluent
   const name = textInputGroup({ label: 'Recipe name', value: currentRecipe.name });
@@ -175,26 +174,26 @@ export function renderBuilder(host, ctx) {
 }
 
 /* ---------- Preset chips ---------- */
-function renderPresetChips() {
+function renderPresetChips(activePresetId) {
   const row = createEl('div', {
-    style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', padding: '2px 2px 10px' },
+    style: { display: 'flex', gap: '8px', overflowX: 'auto', padding: '2px 2px 10px' },
   });
+  // "Blank" chip first
+  const blankActive = !activePresetId;
+  const blank = createEl('button', {
+    style: chipStyle(blankActive),
+    onclick: () => {
+      currentRecipe = null; // will be recreated as blank below
+      const host = document.getElementById('screen-builder');
+      renderBuilder(host, {});
+    },
+  }, ['＋ Blank']);
+  row.appendChild(blank);
+
   for (const p of PRESETS) {
+    const isActive = activePresetId === p.presetId;
     const chip = createEl('button', {
-      style: {
-        flex: '0 0 auto',
-        padding: '10px 14px',
-        borderRadius: '999px',
-        border: '1.5px solid var(--coral-soft)',
-        background: 'var(--card)',
-        color: 'var(--ink)',
-        fontSize: '12.5px',
-        fontWeight: '700',
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        boxShadow: '0 4px 10px -4px rgba(42,31,20,0.12)',
-        whiteSpace: 'nowrap',
-      },
+      style: chipStyle(isActive),
       onclick: () => {
         currentRecipe = clonePreset(p);
         const host = document.getElementById('screen-builder');
@@ -203,10 +202,28 @@ function renderPresetChips() {
     }, [`${p.icon || '✨'}  ${p.name}`]);
     row.appendChild(chip);
   }
-  return createEl('div', {}, [
-    createEl('div', { class: 'field-label', text: 'Start from a preset', style: { marginBottom: '8px' } }),
+  return createEl('div', { style: { marginBottom: '14px' } }, [
+    createEl('div', { class: 'field-label', text: 'Templates', style: { marginBottom: '8px' } }),
     row,
   ]);
+}
+
+function chipStyle(isActive) {
+  return {
+    flex: '0 0 auto',
+    padding: '10px 14px',
+    borderRadius: '999px',
+    border: isActive ? '1.5px solid var(--coral)' : '1.5px solid transparent',
+    background: isActive ? 'var(--coral-soft)' : 'var(--card)',
+    color: isActive ? 'var(--coral-deep)' : 'var(--ink)',
+    fontSize: '12.5px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    boxShadow: '0 4px 10px -4px rgba(42,31,20,0.12)',
+    whiteSpace: 'nowrap',
+    transition: 'all 180ms',
+  };
 }
 
 /* ---------- Ingredient card ---------- */
