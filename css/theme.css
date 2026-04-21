@@ -77,6 +77,16 @@
    ========================================================================== */
 * { box-sizing: border-box; }
 
+/* Hide all scrollbars app-wide — we want this to feel native, not web-y. */
+* {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE / old Edge */
+}
+*::-webkit-scrollbar {
+  display: none;                   /* WebKit (Safari, Chrome, iOS PWA) */
+  width: 0; height: 0;
+}
+
 html, body {
   margin: 0; padding: 0;
   min-height: 100vh;
@@ -84,6 +94,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
   color: var(--ink);
   background: var(--cream);
+  overflow-x: hidden;              /* no accidental sideways scroll */
 }
 
 body {
@@ -117,7 +128,12 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 .status-bar {
-  padding: 16px 24px 8px;
+  /* Sit below the iOS status bar (time/battery) instead of under it. */
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 12px)
+    calc(env(safe-area-inset-right, 0px) + 24px)
+    8px
+    calc(env(safe-area-inset-left, 0px) + 24px);
   display: flex; justify-content: space-between; align-items: center;
   font-size: 14px; font-weight: 700; color: var(--ink);
   flex-shrink: 0;
@@ -132,10 +148,12 @@ input[type="number"] { -moz-appearance: textfield; }
 .screen {
   position: absolute; inset: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px 22px calc(var(--tabbar-h) + 24px);
   opacity: 0; pointer-events: none;
   transform: translateX(24px);
   transition: transform 340ms var(--ease-smooth), opacity 260ms;
+  -webkit-overflow-scrolling: touch;
 }
 .screen.active {
   opacity: 1; pointer-events: auto; transform: translateX(0);
@@ -149,7 +167,11 @@ input[type="number"] { -moz-appearance: textfield; }
 .tab-bar {
   position: sticky;
   bottom: 0;
-  padding: 10px 24px calc(18px + env(safe-area-inset-bottom, 0px));
+  padding:
+    10px
+    calc(env(safe-area-inset-right, 0px) + 24px)
+    calc(env(safe-area-inset-bottom, 0px) + 18px)
+    calc(env(safe-area-inset-left, 0px) + 24px);
   background: rgba(251, 246, 239, 0.92);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
