@@ -13,17 +13,19 @@
   <meta name="theme-color" content="#fbf6ef" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#1f1812" media="(prefers-color-scheme: dark)" />
   <link rel="manifest" href="manifest.json">
-  <!-- iOS home-screen icon. Also exists at /apple-touch-icon.png which iOS
-       auto-probes as a fallback, regardless of what we put in <link>. -->
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon.png">
-  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon.png">
-  <link rel="apple-touch-icon" sizes="120x120" href="apple-touch-icon.png">
-  <link rel="apple-touch-icon-precomposed" href="apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="logo.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="logo.png">
-  <link rel="icon" type="image/png" href="logo.png">
+  <!-- iOS home-screen icon. The ?v=3 query-string busts iOS's sticky
+       apple-touch-icon cache so a fresh Add-to-Home-Screen picks up
+       the latest icon. Also exists at /apple-touch-icon.png which iOS
+       auto-probes as a fallback. -->
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon.png?v=3">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon.png?v=3">
+  <link rel="apple-touch-icon" sizes="120x120" href="apple-touch-icon.png?v=3">
+  <link rel="apple-touch-icon-precomposed" href="apple-touch-icon.png?v=3">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="icon-192.png?v=3">
+  <link rel="icon" type="image/png" href="icon-192.png?v=3">
 
   <!-- Theme preflight (avoids FOUC) -->
   <script>
@@ -53,7 +55,7 @@
     <!-- Status bar / brand -->
     <header class="status-bar">
       <div style="display:inline-flex; align-items:center; gap:10px">
-        <img src="apple-touch-icon.png" alt="" width="32" height="32" style="border-radius:8px;box-shadow:0 4px 12px -4px rgba(229,106,79,0.5);display:block" />
+        <img src="apple-touch-icon.png?v=3" alt="" width="32" height="32" style="border-radius:8px;box-shadow:0 4px 12px -4px rgba(229,106,79,0.5);display:block" />
         <span style="font-weight:800;font-size:15px;letter-spacing:-0.01em">Lab Calc</span>
       </div>
       <button id="theme-toggle" aria-label="Toggle theme"
